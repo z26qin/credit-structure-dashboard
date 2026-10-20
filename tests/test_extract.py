@@ -1,0 +1,89 @@
+from datetime import date
+
+import pytest
+
+from creditdash.errors import LlmError
+from creditdash.extract import PROMPT_VERSION, extract
+from creditdash.models import Extraction, Instrument
+from creditdash.resolve import resolve
+from tests.conftest import FIXTURES
+
+PERIODIC = "0001769628-26-000366"
+K1, K2 = "0001769628-26-000357", "0001769628-26-000432"
+
+CANNED = Extraction(period_end=date(2026, 6, 30), unit_note="$ millions", instruments=[
+    Instrument(name="DDTL 1.0 Facility", kind="delayed_draw_term_loan", seniority_class="parent_secured",
+               principal=1300, maturity="2028-03", source=PERIODIC, quotes=["DDTL 1.0 Facility"]),
+    Instrument(name="DDTL 4.0 Facility", kind="delayed_draw_term_loan", seniority_class="asset_level_secured",
+               principal=2837, maturity="2032-03", source=PERIODIC, quotes=["DDTL 4.0 Facility"]),
+])
+
+
+class FakeAsk:
+    def __init__(self, result=CANNED, error=None):
+        self.calls = []
+        self.result, self.error = result, error
+
+    def __call__(self, prompt, system, schema, *, settings, **kw):
+        self.calls.append({"prompt": prompt, "system": system, "schema": schema})
+        if self.error:
+            raise self.error
+        return self.result, {"cached": False}
+
+
+@pytest.fixture
+def resolved(edgar):
+    return resolve("CRWV", edgar)
+
+
+@pytest.fixture(scope="module")
+def instance_xml():
+    return (FIXTURES / "instance.xml").read_text()
+
+
+@pytest.fixture(scope="module")
+def eight_ks():
+    return {K1: (FIXTURES / "8k-20260807.htm").read_text(), K2: (FIXTURES / "8k-20260917.htm").read_text()}
+
+
+def no_html():
+    raise AssertionError("filing HTML must not be loaded when the instance has a debt text block")
+
+
+def test_prompt_contains_note_and_8ks(resolved, instance_xml, eight_ks, settings):
+    ask = FakeAsk()
+    ext, reason, sources = extract(resolved, instance_xml, no_html, eight_ks, ask=ask, settings=settings)
+    assert ext == CANNED and reason is None
+    prompt = ask.calls[0]["prompt"]
+    assert "DDTL 4.0 Facility" in prompt and f"## 8-K {K1}" in prompt and f"## 8-K {K2}" in prompt
+    assert f"## Periodic filing 10-Q {PERIODIC}, period end 2026-06-30" in prompt
+    assert set(sources) == {PERIODIC, K1, K2}
+    assert "DDTL 4.0 Facility" in sources[PERIODIC] and sources[K1].startswith("Item 1.01")
+    assert ask.calls[0]["schema"] is Extraction
+
+
+def test_system_prompt_rules(resolved, instance_xml, eight_ks, settings):
+    ask = FakeAsk()
+    extract(resolved, instance_xml, no_html, eight_ks, ask=ask, settings=settings)
+    system = ask.calls[0]["system"]
+    assert "$ millions" in system and "recorded once" in system and "verbatim" in system
+    assert PROMPT_VERSION == "extract_v1"
+
+
+def test_no_footnote_skips(resolved, eight_ks, settings):
+    ask = FakeAsk()
+    ext, reason, _ = extract(resolved, "<xbrl/>", lambda: "<p>nothing</p>", eight_ks, ask=ask, settings=settings)
+    assert (ext, reason) == (None, "debt footnote not found") and ask.calls == []
+
+
+def test_html_fallback_used(resolved, eight_ks, settings):
+    ask = FakeAsk()
+    html = "<p><b>Note 9. Debt</b></p>" + "<p>The Term Loan matures in 2029 and bears 7% interest.</p>" * 8
+    ext, reason, sources = extract(resolved, "<xbrl/>", lambda: html, eight_ks, ask=ask, settings=settings)
+    assert ext == CANNED and sources[PERIODIC].startswith("Note 9. Debt")
+
+
+def test_llm_failure_skips(resolved, instance_xml, eight_ks, settings):
+    ask = FakeAsk(error=LlmError("boom"))
+    ext, reason, sources = extract(resolved, instance_xml, no_html, eight_ks, ask=ask, settings=settings)
+    assert (ext, reason) == (None, "LLM failed: boom") and PERIODIC in sources
