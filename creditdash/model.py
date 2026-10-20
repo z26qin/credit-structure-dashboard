@@ -457,6 +457,8 @@ def _waterfall(service: list[ServiceRow], scenarios: list[ScenarioRow],
 
 COVERED, THIN = 2.0, 1.0  # interest covered at least 2x reads as comfortable; under 1x is not covered
 LIQUIDITY_COVERED = 1.5
+TEST_KEYS = ("ebitda_to_next12m_interest", "cfo_plus_interest_to_interest", "fcf_plus_interest_to_interest",
+             "liquidity_to_next12m_debt_service")
 
 
 def status_for(value: float | None, covered: float = COVERED, thin: float = THIN) -> str:
@@ -465,7 +467,7 @@ def status_for(value: float | None, covered: float = COVERED, thin: float = THIN
     return "covered" if value >= covered else "thin" if value >= thin else "not_covered"
 
 
-def _money(m: float | None) -> str:
+def money(m: float | None) -> str:
     if m is None:
         return "—"
     sign, a = ("−" if m < 0 else ""), abs(m)
@@ -506,42 +508,43 @@ def _headline(financials: Financials, periods: list[Period], month_interest: lis
     paid_note = "" if t.interest_paid is not None else " (interest expense used for interest paid)"
     tests = [
         CoverageTest(key="ebitda_to_next12m_interest", label="Earnings", value=e, status=status_for(e),
-                     detail=f"EBITDA {_money(t.ebitda)} (TTM) ÷ next-12-month interest {_money(i12)}"),
+                     detail=f"EBITDA {money(t.ebitda)} (TTM) ÷ next-12-month interest {money(i12)}"),
         CoverageTest(key="cfo_plus_interest_to_interest", label="Operating cash flow", value=c, status=status_for(c),
-                     detail=f"operating cash flow before interest {_money(cfo_pre)} (TTM){paid_note}"),
+                     detail=f"operating cash flow before interest {money(cfo_pre)} (TTM){paid_note}"),
         CoverageTest(key="fcf_plus_interest_to_interest", label="After capex", value=f, status=status_for(f),
-                     detail=f"the same less capex {_money(t.capex)}: {_money(fcf_pre)}"),
+                     detail=f"the same less capex {money(t.capex)}: {money(fcf_pre)}"),
         CoverageTest(key="liquidity_to_next12m_debt_service", label="Liquidity", value=liq,
                      status=status_for(liq, LIQUIDITY_COVERED),
-                     detail=f"cash {_money(cash)}" + (f" + undrawn {_money(undrawn)}" if undrawn else "") +
-                            f" ÷ next-12-month interest and principal {_money((i12 or 0) + (p12 or 0))}"),
+                     detail=f"cash {money(cash)}" + (f" + undrawn {money(undrawn)}" if undrawn else "") +
+                            f" ÷ next-12-month interest and principal {money((i12 or 0) + (p12 or 0))}"),
     ]
+    funding, line = bottom_line({x.key: x.status for x in tests})
     return Headline(next12m_interest=i12, next12m_principal=p12, next12m_refinancing_interest=refi12,
                     refinancing_rate_pct=refi_rate, ttm_interest_incurred=incurred, ttm_interest_paid=t.interest_paid,
-                    undrawn=undrawn, liquidity=liquidity, tests=tests,
-                    takeaway=_takeaway(i12, p12, e, c, f, liq, t.capex, fcf_pre, liquidity, undrawn, refi12, refi_rate))
+                    undrawn=undrawn, liquidity=liquidity, tests=tests, funding=funding, bottom_line=line)
 
 
-def _takeaway(i12, p12, e, c, f, liq, capex, fcf_pre, liquidity, undrawn, refi12, rate) -> str:
-    if not i12:
-        return "No interest is scheduled on today's debt over the next 12 months."
-    parts = [f"Next 12 months: {_money(i12)} of interest on today's debt and {_money(p12)} of scheduled principal."]
-    by = [f"{x:.1f}x by {name}" for x, name in ((e, "EBITDA"), (c, "operating cash flow")) if x is not None]
-    if by:
-        parts.append("Interest is covered " + " and ".join(by) + ".")
-    if f is not None:
-        if f >= THIN:
-            parts.append(f"After {_money(capex)} of capex it is still covered {f:.1f}x.")
-        elif f >= 0:
-            parts.append(f"After {_money(capex)} of capex it is not covered ({f:.1f}x), so part of it depends on new "
-                         "funding.")
-        else:
-            parts.append(f"After {_money(capex)} of capex it is not covered: cash flow before interest is "
-                         f"{_money(fcf_pre)}, so interest depends on new funding.")
-    if liq is not None:
-        source = "Cash and undrawn facilities of {} cover" if undrawn else "Cash of {} covers"
-        parts.append(source.format(_money(liquidity)) + f" {liq:.1f}x the next 12 months of interest and principal.")
-    if refi12 > 0.5 and rate:
-        parts.append(f"Refinancing the principal due in that time at {rate:.1f}% (assumed) would add about "
-                     f"{_money(refi12)} of interest.")
-    return " ".join(parts)
+def bottom_line(status: dict[str, str]) -> tuple[str | None, str]:
+    """The tests in words, from their statuses alone (the numbers sit right above): whether the company needs
+    outside money, then why."""
+    e, c, f, liq = (status.get(k, "n/a") for k in TEST_KEYS)
+    ok = ("covered", "thin")
+    parts = []
+    if c == "not_covered":
+        parts.append("Operating cash flow doesn't cover interest.")
+    elif e == "not_covered" and c in ok:
+        parts.append("Earnings don't cover interest; operating cash flow does.")
+    capex = {"covered": "cash flow covers capex and interest", "thin": "cash flow only just covers capex and interest",
+             "not_covered": "cash flow doesn't cover capex and interest"}.get(f)
+    cash = {"covered": "liquidity covers next year's interest and principal",
+            "thin": "liquidity only just covers next year's interest and principal",
+            "not_covered": "liquidity falls short of next year's interest and principal"}.get(liq)
+    clauses = [x for x in (capex, cash) if x]
+    if clauses:
+        joined = "; ".join(clauses)
+        parts.append(joined[0].upper() + joined[1:] + ".")
+    label = None
+    if f != "n/a" and liq != "n/a":
+        label = {(True, True): "Self-funding", (True, False): "Pays its way, but must refinance",
+                 (False, True): "Burns cash on capex", (False, False): "Needs new capital"}[(f in ok, liq in ok)]
+    return label, " ".join(parts)

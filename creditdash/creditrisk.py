@@ -2,13 +2,15 @@
 
 Implied hazard λ = spread / (1 − recovery); cumulative PD over t years = 1 − exp(−λ t). The spread is the
 5-year CDS from overrides, else the highest bond yield-to-worst less SOFR. The model then judges, from the
-dashboard's own coverage figures only, whether that price looks like an overreaction; every metric it cites
-must be one it was given.
+dashboard's own coverage figures only, whether that price looks like an overreaction. It writes no numbers:
+it names figures as {key} placeholders and code fills in the formatted values, so every number on the page is
+one it was given.
 """
 from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -17,9 +19,10 @@ from pydantic import BaseModel
 from . import llm
 from .config import Settings
 from .errors import LlmError
+from .model import money
 from .models import Financials, Market, ModelOutput
 
-PROMPT_VERSION = "risk_v2"
+PROMPT_VERSION = "risk_v3"
 PROMPT_FILE = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 
 
@@ -32,9 +35,24 @@ class Implied(BaseModel):
     pd_5y: float
 
 
+PLACEHOLDER = re.compile(r"\{([A-Za-z0-9_]+)\}")
+SPOKEN_PERIOD = re.compile(r"\b(?:1|5|12)[- ](?:year|month)s?\b")  # "next 12 months" is not a figure
+OWN_UNIT = re.compile(r"\{\w+_to_\w+\}\s*(?:times|x)\b|\b(?:negative|minus)\s+(?:of\s+)?\{", re.I)
+Verdict = Literal["overreaction", "fair", "underpricing", "unclear"]
+
+
+class Draft(BaseModel):
+    """What the model writes: short sentences that name figures as {key} placeholders."""
+    verdict: Verdict
+    reasons: list[str]
+    watch: str = ""
+
+
 class Assessment(BaseModel):
-    verdict: Literal["overreaction", "fair", "underpricing", "unclear"]
-    summary: str
+    """The draft with every placeholder filled in by code."""
+    verdict: Verdict
+    reasons: list[str]
+    watch: str = ""
     cited: list[str]
 
 
@@ -80,17 +98,62 @@ def metrics(f: Financials, m: ModelOutput) -> dict[str, float | None]:
     }
 
 
+def formatted(key: str, value) -> str:
+    if isinstance(value, str):
+        return value
+    if key in ("pd_1y", "pd_5y", "hazard"):
+        return f"{value * 100:.1f}%"
+    if key == "recovery":
+        return f"{value * 100:.0f}%"
+    if key == "spread_bps":
+        return f"{value:,.0f}bp"
+    if "_to_" in key:
+        return f"{value:.1f}x".replace("-", "−")
+    return money(value)
+
+
+def readable(draft: Draft, values: dict) -> tuple[Assessment, list[str]]:
+    """Fill in the placeholders. Problems: a figure that is unknown or null, or a number the model wrote itself."""
+    cited, problems = [], []
+
+    def fill(text: str) -> str:
+        for key in PLACEHOLDER.findall(text):
+            if values.get(key) is None:
+                problems.append(f"{{{key}}} is not a figure you were given")
+            elif key not in cited:
+                cited.append(key)
+        if any(ch.isdigit() for ch in SPOKEN_PERIOD.sub("", PLACEHOLDER.sub("", text))):
+            problems.append(f'"{text}" has a number you wrote yourself; use a {{key}} placeholder')
+        if OWN_UNIT.search(text):
+            problems.append(f'"{text}" adds "times" or a sign: the value already carries its unit and sign')
+        return PLACEHOLDER.sub(lambda m: formatted(m.group(1), values[m.group(1)])
+                               if values.get(m.group(1)) is not None else m.group(0), text)
+
+    reasons = [fill(r) for r in draft.reasons if r.strip()]
+    if not reasons:
+        problems.append("no reasons given")
+    return Assessment(verdict=draft.verdict, reasons=reasons, watch=fill(draft.watch), cited=cited), problems
+
+
 def assess(imp: Implied, mets: dict, *, ask: Callable = llm.ask, settings: Settings,
            use_cache: bool = True) -> tuple[Assessment | None, str]:
-    facts = {"implied": imp.model_dump(), "metrics": {k: (None if v is None else round(v, 4)) for k, v in mets.items()}}
-    try:
-        a, _ = ask(json.dumps(facts, indent=1), PROMPT_FILE.read_text(), Assessment, settings=settings, use_cache=use_cache)
-    except LlmError as e:
-        return None, f"LLM failed: {e}"
-    bad = [c for c in a.cited if c not in mets and c not in Implied.model_fields]
-    if bad or not a.cited:
-        return None, "the model cited figures it was not given: " + ", ".join(bad) if bad else "the model cited no figures"
-    return a, ""
+    """One draft, sent back once with its problems if it has any. The model sees each figure as the page will
+    show it, so its sentence reads right around the filled-in value."""
+    values = {**imp.model_dump(), **mets}
+    facts = {"figures": {k: formatted(k, v) for k, v in values.items() if v is not None},
+             "not_available": [k for k, v in values.items() if v is None]}
+    prompt = json.dumps(facts, indent=1, ensure_ascii=False)
+    for _ in range(2):
+        try:
+            draft, _ = ask(prompt, PROMPT_FILE.read_text(), Draft, settings=settings, use_cache=use_cache)
+        except LlmError as e:
+            return None, f"LLM failed: {e}"
+        a, problems = readable(draft, values)
+        if not problems:
+            return a, ""
+        prompt = (json.dumps(facts, indent=1, ensure_ascii=False) + "\n\nYour last reply was sent back: " + "; ".join(problems) +
+                  ". It was:\n" + draft.model_dump_json())
+    return None, "the model's read was left out: " + "; ".join(problems)
 
 
 def risk_view(f: Financials, m: ModelOutput, market: Market, recovery: float, *, use_llm: bool,

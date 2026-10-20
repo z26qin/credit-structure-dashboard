@@ -326,7 +326,8 @@ class Headline(BaseModel):
     undrawn: float  # committed, undrawn revolvers
     liquidity: float | None  # cash + undrawn
     tests: list[CoverageTest]
-    takeaway: str
+    funding: str | None  # e.g. "Needs new capital": from the after-capex and liquidity statuses
+    bottom_line: str  # the statuses in plain words, without numbers
 
 
 class ModelOutput(BaseModel):

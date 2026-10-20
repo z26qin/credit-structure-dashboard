@@ -88,7 +88,7 @@ def test_top_card_answers_coverage_without_market_data():
     top = html[html.index('id="risk"'):html.index('id="kpis"')]
     for label in ("Earnings", "Operating cash flow", "After capex", "Liquidity"):
         assert label in top
-    assert "covered 8.2x by EBITDA" in top and "Not covered" in top
+    assert "Needs new capital" in top and "Not covered" in top and "Model's read" not in top
 
 
 def test_interest_kpi_is_forward_looking():

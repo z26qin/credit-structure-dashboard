@@ -63,10 +63,17 @@
       </div>
       {% endif %}
     </div>
-    {% if h %}<p class="cw-risk-text">{{ h.takeaway }}</p>{% endif %}
-    {% if r and r.assessment %}<p class="cw-risk-text"><b>The model's read:</b> {{ r.assessment.summary }}</p>
-    <p class="cw-note">Read by the model from the figures in this card only (cited: {{ r.assessment.cited | join(", ") }}). Implied probability assumes a flat hazard rate; a single bond's yield can also reflect convertible terms or thin trading. Covered means at least 2.0x (liquidity 1.5x), thin at least 1.0x.</p>
-    {% elif h %}<p class="cw-note">Covered means at least 2.0x (liquidity 1.5x), thin at least 1.0x. Interest is the coupon on today's debt over the next 12 months; operating cash flow is trailing twelve months with interest paid added back.</p>{% endif %}
+    {% set a = r.assessment if r else none %}
+    {% if (h and h.bottom_line) or a %}
+    <dl class="cw-read">
+      {% if h and h.bottom_line %}<dt>Bottom line</dt>
+      <dd>{% if h.funding %}<b>{{ h.funding }}.</b> {% endif %}{{ h.bottom_line }}</dd>{% endif %}
+      {% if a %}<dt>Model's read</dt>
+      <dd><ul>{% for x in a.reasons %}<li>{{ x }}</li>{% endfor %}</ul></dd>
+      {% if a.watch %}<dt>Watch</dt><dd>{{ a.watch }}</dd>{% endif %}{% endif %}
+    </dl>
+    {% endif %}
+    <p class="cw-note">Covered: 2.0x or more (liquidity 1.5x); thin: 1.0x or more.{% if a %} The model's read uses only the figures above, and code fills in every number in it.{% endif %}{% if r and r.implied and r.implied.basis.startswith("worst bond") %} A single bond's yield can also reflect convertible terms or thin trading.{% endif %}</p>
     {% if r and r.note and r.implied %}<p class="cw-note">{{ r.note }}</p>{% endif %}
   </section>
 
