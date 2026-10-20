@@ -7,10 +7,12 @@
   const LABELS = {
     asset_level_secured: "Asset-level secured", parent_secured: "Parent secured",
     senior_unsecured: "Senior unsecured", convertible: "Convertible", other: "Other", equity: "Equity",
+    refinanced: "Refinanced (assumed)",
   };
   const SCENARIO_LABELS = { consensus: "Consensus", ttm: "TTM flat", "run-rate": "Run-rate", stress: "Stress" };
   const SKIPPED = D.extraction_skipped;
-  const state = { scenario: null, period: null };
+  const state = { scenario: null, period: null, wall: "all" };
+  const HEAD = D.model.headline;  // next-12-month interest and the coverage tests, computed once in the model
 
   // --- helpers ---------------------------------------------------------------------------------
   const isNum = (v) => typeof v === "number" && isFinite(v);
@@ -107,7 +109,7 @@
     const f = D.financials, label = D.market.ebitda_label.startsWith("EBITDA (") ? "EBITDA" : D.market.ebitda_label;
     const debt = f.total_debt.value, cash = f.cash.value;
     const net = isNum(debt) && isNum(cash) ? debt - cash : null;
-    const ttmE = f.ttm.ebitda, ttmI = f.ttm.interest_expense;
+    const ttmE = f.ttm.ebitda;
     const pf = D.instruments.reduce((s, i) => s + balance(i), 0);
     const insts = realInstruments().filter((i) => balance(i) > 0);
     const eff = insts.filter((i) => isNum(i.effective_rate_pct));
@@ -127,7 +129,9 @@
       ["Cash", money(cash), "incl. restricted where reported"],
       ["Net debt", money(net), ""],
       ["Net debt ÷ TTM " + label, isNum(net) && ttmE > 0 ? times(net / ttmE) : "—", "TTM " + money(ttmE) + " · " + D.market.ebitda_label],
-      ["TTM " + label + " ÷ interest", ttmI > 0 && isNum(ttmE) ? times(ttmE / ttmI) : "—", "TTM interest " + money(ttmI)],
+      ["Interest, next 12 months", money(HEAD ? HEAD.next12m_interest : null), HEAD && isNum(HEAD.ttm_interest_incurred)
+        ? "TTM incurred " + money(HEAD.ttm_interest_incurred) + (f.ttm.interest_capitalized > 0
+          ? " incl. " + money(f.ttm.interest_capitalized) + " capitalized" : "") : "coupons on today's debt"],
       ["Operating lease liabilities", money(f.op_lease.value), "not in the debt stack"],
       ["Backlog (RPO)", money(f.rpo.value), ""],
       ["Weighted average rate", pct(wavg), wavgSub],
@@ -259,6 +263,15 @@
       (isNum(D.model.fit_error) ? " (largest bucket error " + money(D.model.fit_error, 2) + ")" : "") +
       "; post-period draws are scheduled on top. Interest is charged monthly on the opening balance; floating rates use SOFR " +
       pct(sofr, 2) + " held flat."));
+    if (HEAD) {
+      ml.append(el("li", {}, "Interest for the next 12 months is the coupon on today's debt, month by month. Operating cash " +
+        "flow is trailing twelve months with interest paid added back; 'after capex' subtracts trailing capex. Trailing interest " +
+        "incurred adds capitalized interest (" + money(f.ttm.interest_capitalized) + ") to interest expense."));
+      if (isNum(HEAD.refinancing_rate_pct)) ml.append(el("li", {}, "Refinancing: principal falling due is assumed to be " +
+        "refinanced at " + HEAD.refinancing_rate_pct.toFixed(1) + "% (today's average rate unless config/model.yaml sets " +
+        "refinancing_rate_pct), so its interest keeps running; it is shown separately wherever it appears. Funding for capex " +
+        "is not added: it stays in 'cash to raise', because new debt for growth without the EBITDA it buys would understate coverage."));
+    }
     ml.append(el("li", {}, "Scenarios: consensus when given in overrides (current year less reported quarters); TTM held flat; run-rate = latest quarter × 4; stress = consensus or TTM less " +
       Math.round((D.settings.stress_haircut || 0) * 100) + "% from the fiscal year after the period end."));
     const undated = D.instruments.filter((i) => balance(i) > 0 && (i.source === "reconcile" || !i.maturity));
@@ -364,17 +377,20 @@
     if (onClick) band.on("click", onClick);
   }
   const classesPresent = () => CLASSES.filter((c) => D.instruments.some((i) => i.seniority_class === c && balance(i) > 0));
-  function serviceByPeriod() {
+  const REFI_INTEREST = Object.fromEntries((D.model.refinancing || []).map((r) => [r.period, r.interest]));
+  const refiRateText = () => (HEAD && isNum(HEAD.refinancing_rate_pct) ? " at " + HEAD.refinancing_rate_pct.toFixed(1) + "%" : "");
+  // Per period and class: interest + principal ("all") or interest only, with interest on refinanced maturities on top.
+  function serviceByPeriod(mode) {
     return PERIODS.map((p) => {
-      const o = { period: p, total: 0 };
+      const o = { period: p, total: 0, refinanced: REFI_INTEREST[p] || 0 };
       for (const c of CLASSES) { o[c] = 0; o[c + "_p"] = 0; o[c + "_i"] = 0; }
       for (const r of D.model.debt_service) {
         if (r.period !== p) continue;
-        o[r.seniority_class] += r.principal + r.interest;
+        o[r.seniority_class] += mode === "interest" ? r.interest : r.principal + r.interest;
         o[r.seniority_class + "_p"] += r.principal;
         o[r.seniority_class + "_i"] += r.interest;
-        o.total += r.principal + r.interest;
       }
+      o.total = CLASSES.reduce((sum, c) => sum + o[c], 0) + o.refinanced;
       return o;
     });
   }
@@ -501,14 +517,30 @@
   }
 
   // --- 5. payout wall ------------------------------------------------------------------------------
+  // Two views: interest plus scheduled principal, or interest only (principal is usually refinanced, so
+  // "can it pay its interest" needs its own view). Interest on refinanced maturities (assumed) sits on top.
   function drawWall() {
     const node = prep("wall-chart");
+    const seg = document.getElementById("wall-mode");
+    seg.replaceChildren();
+    for (const [k, label] of [["all", "Interest + principal"], ["interest", "Interest only"]]) {
+      const b = el("button", { type: "button", "aria-pressed": String(state.wall === k) }, label);
+      b.addEventListener("click", () => { state.wall = k; drawWall(); });
+      seg.append(b);
+    }
+    const rows = serviceByPeriod(state.wall);
+    const anyRefi = rows.some((o) => o.refinanced > 1e-6);
+    document.getElementById("wall-note").textContent = (state.wall === "interest"
+      ? "Interest only, by fiscal year: on today's debt, stacked senior (bottom) to junior"
+      : "Interest plus scheduled principal on today's debt by fiscal year, stacked senior (bottom) to junior") +
+      (anyRefi ? ", with interest on refinanced maturities (assumed) on top" : "") +
+      ". The line is EBITDA under the chosen scenario; a red bracket marks payout it does not cover. Click a year to open its waterfall.";
     legend(document.getElementById("wall-legend"), [
-      ...classesPresent().map((c) => ({ color: color(c), label: LABELS[c] })),
+      ...classesPresent().map((c) => ({ color: color(c), label: LABELS[c] + (state.wall === "interest" ? " interest" : "") })),
+      ...(anyRefi ? [{ color: color("refinanced"), label: "Interest on refinanced maturities (assumed" + refiRateText() + ")" }] : []),
       { kind: "line", color: css("--c-line"), label: scenarioName(state.scenario) + " " + D.market.ebitda_label },
       { kind: "bracket", color: css("--bad"), label: "Gap: payout EBITDA does not cover" },
     ]);
-    const rows = serviceByPeriod();
     if (!rows.some((o) => o.total > 0)) return unavailable(node, "no scheduled debt service");
     const H = 320;
     const { svg, W } = makeSvg(node, H);
@@ -527,7 +559,8 @@
     gridY(svg, y, ticks, ml, W);
     axes(svg, x, y, ticks, fmt, ml, H, PERIODS);
     const g = svg.append("g");
-    rows.forEach((o) => drawColumn(g, cx(o.period) - bw / 2, bw, y, CLASSES.map((c) => ({ key: c, value: o[c] })), color));
+    const keys = [...CLASSES, "refinanced"];
+    rows.forEach((o) => drawColumn(g, cx(o.period) - bw / 2, bw, y, keys.map((c) => ({ key: c, value: o[c] })), color));
     rows.forEach((o) => {
       if (o.total > 0) svg.append("text").attr("x", cx(o.period)).attr("y", y(o.total) - 7).attr("text-anchor", "middle")
         .style("fill", css("--fg")).style("font-weight", 600).text(money(o.total));
@@ -555,9 +588,10 @@
     hoverBands(svg, x, H, PERIODS, (event, p) => {
       const o = rows.find((r) => r.period === p), e = scenarioValue(state.scenario, p);
       showTip(event, p + " · " + scenarioName(state.scenario), [
-        ...CLASSES.slice().reverse().filter((c) => o[c] > 1e-6).map((c) =>
-          [c, LABELS[c] + " · interest " + money(o[c + "_i"]) + " + principal " + money(o[c + "_p"]), money(o[c])]),
-        [null, "Total payout", money(o.total)],
+        ...CLASSES.slice().reverse().filter((c) => o[c] > 1e-6).map((c) => [c, LABELS[c] + (state.wall === "interest"
+          ? " · interest" : " · interest " + money(o[c + "_i"]) + " + principal " + money(o[c + "_p"])), money(o[c])]),
+        ...(o.refinanced > 1e-6 ? [["refinanced", "Interest on refinanced maturities (assumed)", money(o.refinanced)]] : []),
+        [null, state.wall === "interest" ? "Total interest" : "Total payout", money(o.total)],
         ...(isNum(e) ? [["line", D.market.ebitda_label, money(e)],
                         [null, e >= o.total ? "Covered" : "Gap", e >= o.total ? times(o.total ? e / o.total : null) : money(o.total - e)]] : []),
       ]);
@@ -565,22 +599,30 @@
   }
 
   // --- 6. coverage ---------------------------------------------------------------------------------
-  // One highlighted line (the scenario chosen above), the others in gray: emphasis instead of four hues.
+  // The scenario chosen above, three ways. The headline assumes maturities are refinanced, so interest keeps
+  // running; today's debt alone climbs toward infinity as it matures, so it is context and does not set the scale.
   function drawCoverage() {
     const node = prep("coverage-chart");
-    const names = [...new Set(D.model.coverage.map((r) => r.scenario))];
-    const sel = names.includes(state.scenario) ? state.scenario : names[0];
+    const sel = state.scenario;
+    const MEASURES = [
+      { key: "icr_refi", label: "Interest, maturities refinanced (assumed" + refiRateText() + ")", color: css("--c-highlight"),
+        kind: "line", width: 2, markers: true },
+      { key: "icr", label: "Interest, today's debt only (runs off)", color: css("--c-highlight"), kind: "dash", width: 1.5,
+        dash: "5 4", context: true },
+      { key: "dscr", label: "Interest + scheduled principal", color: css("--c-context"), kind: "line", width: 1.5 },
+    ];
+    const rows = D.model.coverage.filter((r) => r.scenario === sel);
+    const present = MEASURES.filter((m) => rows.some((r) => isNum(r[m.key])));
     legend(document.getElementById("coverage-legend"), [
-      ...(sel ? [{ kind: "line", color: css("--c-highlight"), label: scenarioName(sel) + " (chosen above)" }] : []),
-      ...(names.length > 1 ? [{ kind: "line", color: css("--c-context"), label: "Other scenarios" }] : []),
+      ...present.map((m) => ({ kind: m.kind, color: m.color, label: m.label })),
       { kind: "dash", color: css("--bad"), label: "1.0x: payout just covered" },
     ]);
-    const rows = D.model.coverage.filter((r) => isNum(r.dscr));
-    if (!rows.length) return unavailable(node, "no coverage: EBITDA or debt service missing");
+    if (!present.length) return unavailable(node, "no coverage: EBITDA or debt service missing");
     const H = 260, CAP = 10;
     const { svg, W } = makeSvg(node, H);
-    const ymax = Math.min(CAP, Math.max(1.5, d3.max(rows, (r) => r.dscr) * 1.1));
-    const y = d3.scaleLinear([Math.min(0, d3.min(rows, (r) => r.dscr)), ymax], [H - 26, 14]).nice();
+    const values = rows.flatMap((r) => present.filter((m) => !m.context).map((m) => r[m.key]).filter(isNum));
+    const ymax = Math.min(CAP, Math.max(1.5, (d3.max(values) || 1) * 1.25));
+    const y = d3.scaleLinear([Math.min(0, d3.min(values)), ymax], [H - 26, 14]).nice();
     const ticks = y.ticks(5);
     const ml = d3.max(ticks, (t) => textWidth(svg, t + "x")) + 10;
     const endRoom = 64;
@@ -590,30 +632,33 @@
     svg.append("line").attr("x1", ml).attr("x2", W - endRoom + 8).attr("y1", y(1)).attr("y2", y(1))
       .style("stroke", css("--bad")).style("stroke-width", 1.5).style("stroke-dasharray", "5 4");
     svg.append("text").attr("x", W - endRoom + 12).attr("y", y(1) + 4).text("1.0x");
-    const series = (s) => PERIODS.map((p) => rows.find((r) => r.scenario === s && r.period === p)).filter(Boolean);
-    const line = d3.line().x((r) => x(r.period)).y((r) => y(Math.min(r.dscr, ymax)));
-    for (const s of names.filter((n) => n !== sel)) {
-      svg.append("path").attr("d", line(series(s))).style("fill", "none").style("stroke", css("--c-context"))
-        .style("stroke-width", 1.5).style("stroke-linejoin", "round");
-    }
-    if (sel) {
-      const pts = series(sel);
-      svg.append("path").attr("d", line(pts)).style("fill", "none").style("stroke", css("--c-highlight"))
-        .style("stroke-width", 2).style("stroke-linejoin", "round").style("stroke-linecap", "round");
-      svg.append("g").selectAll("circle").data(pts).join("circle").attr("cx", (r) => x(r.period))
-        .attr("cy", (r) => y(Math.min(r.dscr, ymax))).attr("r", 4).style("fill", css("--c-highlight"))
-        .style("stroke", css("--panel")).style("stroke-width", 2);
-      const last = pts[pts.length - 1];
-      if (last) svg.append("text").attr("x", x(last.period) + 8).attr("y", y(Math.min(last.dscr, ymax)) + 4)
-        .style("fill", css("--fg")).style("font-weight", 600).text(times(last.dscr));
+    // Lines above the scale leave through the top edge instead of flattening along it.
+    svg.append("clipPath").attr("id", "coverage-clip").append("rect").attr("x", 0).attr("y", y.range()[1] - 4)
+      .attr("width", W).attr("height", y.range()[0] - y.range()[1] + 8);
+    const line = (key) => d3.line().defined((r) => isNum(r[key])).x((r) => x(r.period)).y((r) => y(r[key]));
+    const ordered = PERIODS.map((p) => rows.find((r) => r.period === p)).filter(Boolean);
+    for (const m of [...present].reverse()) {  // the headline measure is drawn last, on top
+      svg.append("path").attr("d", line(m.key)(ordered)).attr("clip-path", "url(#coverage-clip)")
+        .style("fill", "none").style("stroke", m.color)
+        .style("stroke-width", m.width).style("stroke-dasharray", m.dash || null).style("stroke-linejoin", "round");
+      if (m.markers) {
+        const pts = ordered.filter((r) => isNum(r[m.key]));
+        svg.append("g").selectAll("circle").data(pts).join("circle").attr("cx", (r) => x(r.period))
+          .attr("cy", (r) => y(Math.min(r[m.key], ymax))).attr("r", 4).style("fill", m.color)
+          .style("stroke", css("--panel")).style("stroke-width", 2);
+        const last = pts[pts.length - 1];
+        if (last) svg.append("text").attr("x", x(last.period) + 8).attr("y", y(Math.min(last[m.key], ymax)) + 4)
+          .style("fill", css("--fg")).style("font-weight", 600).text(times(last[m.key]));
+      }
     }
     const step = PERIODS.length > 1 ? x.step() : W - ml;
     svg.append("g").selectAll("rect").data(PERIODS).join("rect").attr("class", "cw-hit")
       .attr("x", (p) => x(p) - step / 2).attr("width", step).attr("y", 0).attr("height", H - 26).style("fill", "transparent")
-      .on("pointermove", (event, p) => showTip(event, p + " · coverage", names.map((s) => {
-        const r = rows.find((q) => q.scenario === s && q.period === p);
-        return [s === sel ? "line" : null, scenarioName(s), r ? times(r.dscr) : "—"];
-      }))).on("pointerleave", hideTip);
+      .on("pointermove", (event, p) => {
+        const r = rows.find((q) => q.period === p) || {};
+        showTip(event, p + " · " + scenarioName(sel), present.map((m) =>
+          [m.key === "icr_refi" ? "line" : null, m.label, isNum(r[m.key]) ? times(r[m.key]) + (r[m.key] > y.domain()[1] ? " (off scale)" : "") : "—"]));
+      }).on("pointerleave", hideTip);
   }
 
   // --- 7. cash to raise ------------------------------------------------------------------------------
@@ -627,9 +672,8 @@
     if (!rows.length) return unavailable(node, "no capex reported, so cash to raise cannot be estimated");
     const hasConsensus = D.market.consensus.some((c) => isNum(c.capex) || isNum(c.cfo));
     const total = d3.sum(rows, (r) => r.to_raise);
-    document.getElementById("raise-note").textContent = "Capex plus scheduled principal, less cash from operations (" +
-      (hasConsensus ? "consensus" : "TTM held flat") + "). " + money(total) + " to raise across the years shown; " +
-      "a floor, since it leaves out repaying the new debt itself.";
+    document.getElementById("raise-note").textContent = "Capex plus scheduled principal, less cash from operations (" + (hasConsensus ? "consensus" : "TTM held flat") + "). " + money(total) +
+      " to raise across the years shown.";
     const H = 260;
     const { svg, W } = makeSvg(node, H);
     const need = rows.map((r) => r.capex + r.principal);

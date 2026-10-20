@@ -167,3 +167,9 @@ def test_20f_annual_only_uses_the_fiscal_year_as_ttm():
         (529.8, -611.7, 417.9, 61.5, 384.8, 4066.0)
     assert fin.total_debt.value == 4836.8 and fin.cash.value == 3721.6
     assert fin.shares_outstanding.value > 200e6
+
+
+def test_capitalized_interest_in_ttm(fin):
+    # CRWV capitalizes interest on data centers under construction; "interest expense" leaves it out.
+    assert fin.quarters[-1].interest_capitalized == 79.0
+    assert fin.ttm.interest_capitalized == pytest.approx(61.764 + 83.958 + 97.0 + 79.0)

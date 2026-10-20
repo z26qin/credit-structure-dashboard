@@ -104,3 +104,24 @@ def test_maturity_diff():
 def test_matured_before_period_end_noted():
     rec, _ = reconcile(ext(inst("Term Loan", 400), inst("Old", 600, maturity="2026-05")), fin(), SOURCES)
     assert any("Old" in n and "matured" in n for n in rec.notes)
+
+
+AVAIL = "The Company has availability under the Charter Operating credit facilities of approximately $3.4 billion."
+
+
+def test_undrawn_revolver_kept_when_quoted():
+    e = ext(inst("Term Loan", 1000)).model_copy(update={"undrawn_revolver": 3400.0, "undrawn_revolver_quote": AVAIL})
+    rec, _ = reconcile(e, fin(), {"A": SOURCE + "\n" + AVAIL})
+    assert rec.undrawn_revolver == 3400.0
+
+
+def test_undrawn_revolver_dropped_when_not_in_the_text():
+    e = ext(inst("Term Loan", 1000)).model_copy(update={"undrawn_revolver": 3400.0, "undrawn_revolver_quote": AVAIL})
+    rec, _ = reconcile(e, fin(), SOURCES)
+    assert rec.undrawn_revolver is None and any("undrawn" in n for n in rec.notes)
+
+
+def test_undrawn_revolver_number_must_match_its_quote():
+    e = ext(inst("Term Loan", 1000)).model_copy(update={"undrawn_revolver": 5000.0, "undrawn_revolver_quote": AVAIL})
+    rec, _ = reconcile(e, fin(), {"A": SOURCE + "\n" + AVAIL})
+    assert rec.undrawn_revolver is None

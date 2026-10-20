@@ -57,6 +57,7 @@ def reconcile(extraction: Extraction | None, financials: Financials,
         if not i.verified:
             unverified.append(i.name)
 
+    undrawn = _checked_undrawn(extraction, normalized, scale, notes)
     for i in instruments:
         d = maturity_date(i.maturity)
         if d is not None and d < financials.period_end and (i.principal or 0) > 0:
@@ -67,7 +68,8 @@ def reconcile(extraction: Extraction | None, financials: Financials,
     if reported is None:
         notes.append("no reported debt total to check against")
         return Reconciliation(status=ReconStatus.warn, extracted_total=extracted, scale_applied=scale,
-                              unverified=unverified, maturity_diff=maturity_diff, notes=notes), instruments
+                              unverified=unverified, maturity_diff=maturity_diff, undrawn_revolver=undrawn,
+                              notes=notes), instruments
 
     gap = reported - extracted
     gap_pct = gap / reported if reported else 0.0
@@ -79,7 +81,7 @@ def reconcile(extraction: Extraction | None, financials: Financials,
         notes.append(f"extracted exceeds reported by {-gap:,.1f}")
     return Reconciliation(status=status, reported_total=reported, extracted_total=extracted, gap=gap,
                           gap_pct=gap_pct, scale_applied=scale, unverified=unverified,
-                          maturity_diff=maturity_diff, notes=notes), instruments
+                          maturity_diff=maturity_diff, undrawn_revolver=undrawn, notes=notes), instruments
 
 
 def _scale(extracted: float, reported: float | None) -> float:
@@ -116,3 +118,23 @@ def _maturity_diff(instruments: list[Instrument], financials: Financials) -> lis
         if label in bullets:
             bullets[label] += i.principal
     return [{"label": b.label, "reported": b.principal, "bullets": bullets[b.label]} for b in financials.maturities]
+
+
+def _numbers(text: str) -> list[float]:
+    return [float(n.replace(",", "")) for n in re.findall(r"\d[\d,]*(?:\.\d+)?", text)]
+
+
+def _checked_undrawn(extraction: Extraction, sources: list[str], scale: float, notes: list[str]) -> float | None:
+    """The stated revolver availability, kept only if its sentence is in the text and shows the number
+    (in millions, or in billions as "$3.4 billion")."""
+    value, quote = extraction.undrawn_revolver, extraction.undrawn_revolver_quote
+    if value is None:
+        return None
+    value *= scale
+    ok = bool(quote) and any(normalize(quote) in t for t in sources) and any(
+        abs(n - value) < 0.51 or abs(n * 1000 - value) < 51 for n in _numbers(quote))
+    if not ok:
+        notes.append(f"undrawn revolver availability {value:,.0f} was not found as stated in the filing text, "
+                     "so it is left out of liquidity")
+        return None
+    return value

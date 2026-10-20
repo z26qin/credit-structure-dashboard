@@ -19,7 +19,7 @@ from .config import Settings
 from .errors import LlmError
 from .models import Financials, Market, ModelOutput
 
-PROMPT_VERSION = "risk_v1"
+PROMPT_VERSION = "risk_v2"
 PROMPT_FILE = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 
 
@@ -59,22 +59,23 @@ def implied(market: Market, recovery: float) -> Implied | None:
 
 
 def metrics(f: Financials, m: ModelOutput) -> dict[str, float | None]:
-    t = f.ttm
-    first = m.periods[0] if m.periods else None
-    scale = 12 / first.months if first else 0
-    int12 = sum(r.interest for r in m.debt_service if first and r.period == first.label) * scale or None
-    prin12 = sum(r.principal for r in m.debt_service if first and r.period == first.label) * scale
-    interest = t.interest_paid or t.interest_expense
+    """The coverage figures the model may cite, all from the model's headline (one place computes them)."""
+    t, h = f.ttm, m.headline
+    tests = {x.key: x.value for x in h.tests} if h else {}
     div = lambda a, b: None if a is None or not b else a / b
     fcf = None if t.cfo is None or t.capex is None else t.cfo - t.capex
     net = None if f.total_debt.value is None or f.cash.value is None else f.total_debt.value - f.cash.value
+    i12, p12 = (h.next12m_interest, h.next12m_principal) if h else (None, None)
     return {
         "ttm_ebitda": t.ebitda, "ttm_cfo": t.cfo, "ttm_capex": t.capex, "ttm_fcf": fcf,
-        "next12m_interest": int12, "next12m_principal": prin12 if first else None,
-        "ebitda_to_next12m_interest": div(t.ebitda, int12),
-        "cfo_plus_interest_to_interest": div(None if t.cfo is None or not interest else t.cfo + interest, interest),
-        "fcf_plus_interest_to_interest": div(None if fcf is None or not interest else fcf + interest, interest),
-        "cash": f.cash.value, "cash_to_next12m_debt_service": div(f.cash.value, (int12 or 0) + (prin12 or 0)),
+        "next12m_interest": i12, "next12m_principal": p12,
+        "next12m_refinancing_interest": h.next12m_refinancing_interest if h else None,
+        "ebitda_to_next12m_interest": tests.get("ebitda_to_next12m_interest"),
+        "cfo_plus_interest_to_interest": tests.get("cfo_plus_interest_to_interest"),
+        "fcf_plus_interest_to_interest": tests.get("fcf_plus_interest_to_interest"),
+        "cash": f.cash.value, "undrawn_facilities": h.undrawn if h else None,
+        "liquidity_to_next12m_debt_service": tests.get("liquidity_to_next12m_debt_service"),
+        "cash_to_next12m_debt_service": div(f.cash.value, (i12 or 0) + (p12 or 0)),
         "net_debt_to_ebitda": div(net, t.ebitda),
     }
 

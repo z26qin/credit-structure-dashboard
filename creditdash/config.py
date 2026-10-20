@@ -59,6 +59,7 @@ class ModelSettings(BaseModel):
     horizon_years: int = 10
     ipf_max_rounds: int = 50
     recovery_rate: float = 0.40
+    refinancing_rate_pct: float | None = None  # rate maturities are refinanced at; None = today's average rate
 
 
 def load_model_settings(path: Path = MODEL_SETTINGS_FILE) -> ModelSettings:

@@ -18,8 +18,8 @@ from datetime import date, timedelta
 from .config import ModelSettings
 from .facts import bucket_label, fiscal_year_end_date, fiscal_year_of, fiscal_year_start, _months
 from .models import (
-    SENIORITY_LABELS, CoverageRow, Financials, Instrument, Market, ModelOutput, Period, RaiseRow, ScenarioRow,
-    SeniorityClass, ServiceRow, StackClass, WaterfallRow,
+    SENIORITY_LABELS, CoverageRow, CoverageTest, Financials, Headline, Instrument, Market, ModelOutput, Period,
+    RaiseRow, RefinancingRow, ScenarioRow, SeniorityClass, ServiceRow, StackClass, WaterfallRow,
 )
 from .reconcile import maturity_date
 
@@ -84,7 +84,8 @@ def _rate(i: Instrument, sofr: float | None) -> float | None:
 
 
 def run_model(instruments: list[Instrument], financials: Financials, market: Market,
-              settings: ModelSettings) -> ModelOutput:
+              settings: ModelSettings, undrawn_revolver: float | None = None) -> ModelOutput:
+    """`undrawn_revolver`: revolver availability as the filing states it (checked by reconcile), if any."""
     excluded: list[str] = []
     loans: list[_Loan] = []
     # No maturity (the unallocated gap, category totals, an undated revolver): these share whatever the
@@ -139,18 +140,30 @@ def run_model(instruments: list[Instrument], financials: Financials, market: Mar
                 loan.alloc = {k: v * share for k, v in residual.items()}
                 loans.append(loan)
             fit_error = _schedule_error(loans, financials, periods)
-    service = _simulate(loans, months, label_of)
+    service, month_interest, month_principal = _simulate(loans, months, label_of)
 
     scenarios = _scenarios(financials, market, periods, settings)
-    due = defaultdict(float)
+    interest, principal = defaultdict(float), defaultdict(float)
     for r in service:
-        due[r.period] += r.principal + r.interest
+        interest[r.period] += r.interest
+        principal[r.period] += r.principal
+    refi_rate = (settings.refinancing_rate_pct if settings.refinancing_rate_pct is not None
+                 else _gap_rate(loans, financials))
+    refinancing = _refinancing(periods, principal, refi_rate)
+    refi_interest = {r.period: r.interest for r in refinancing}
+    ratio = lambda a, b: a / b if b else None
     coverage = [CoverageRow(scenario=s.scenario, period=s.period,
-                            dscr=s.ebitda / due[s.period] if due[s.period] else None) for s in scenarios]
+                            dscr=ratio(s.ebitda, interest[s.period] + principal[s.period]),
+                            icr=ratio(s.ebitda, interest[s.period]),
+                            icr_refi=ratio(s.ebitda, interest[s.period] + refi_interest.get(s.period, 0.0)))
+                for s in scenarios]
     outstanding = [i for i in instruments if all(i is not m for m in matured)]
+    headline = _headline(financials, periods, month_interest, month_principal, refinancing, refi_rate, outstanding,
+                         undrawn_revolver)
     return ModelOutput(periods=periods, debt_service=service, scenarios=scenarios, coverage=coverage,
-                       raise_rows=_raise(financials, market, periods, service), stack=_stack(outstanding, market),
-                       waterfall=_waterfall(service, scenarios), excluded=excluded, fit_error=fit_error)
+                       raise_rows=_raise(financials, market, periods, service), refinancing=refinancing,
+                       stack=_stack(outstanding, market), waterfall=_waterfall(service, scenarios, refi_interest),
+                       excluded=excluded, fit_error=fit_error, headline=headline)
 
 
 def _drop_matured(financials: Financials, matured: list[Instrument]) -> Financials:
@@ -277,8 +290,10 @@ def _gap_alloc(loans: list[_Loan], financials: Financials, periods: list[Period]
     return {k: v * amount / total for k, v in alloc.items()}
 
 
-def _simulate(loans: list[_Loan], months, label_of) -> list[ServiceRow]:
+def _simulate(loans: list[_Loan], months, label_of) -> tuple[list[ServiceRow], list[float], list[float]]:
+    """Service rows per instrument and period, plus total interest and principal for each month."""
     rows: dict[tuple[str, str], list[float]] = {}
+    month_interest, month_principal = [0.0] * len(months), [0.0] * len(months)
     for loan in loans:
         payments = [0.0] * len(months)
         by_period: dict[str, list[int]] = defaultdict(list)
@@ -314,9 +329,12 @@ def _simulate(loans: list[_Loan], months, label_of) -> list[ServiceRow]:
             acc = rows.setdefault((loan.inst.name, label), [0.0, 0.0])
             acc[0] += paid
             acc[1] += interest
+            month_interest[idx] += interest
+            month_principal[idx] += paid
     by_name = {l.inst.name: l.inst.seniority_class for l in loans}
-    return [ServiceRow(instrument=name, seniority_class=by_name[name], period=label, principal=p, interest=i)
-            for (name, label), (p, i) in rows.items() if p > 1e-9 or i > 1e-9]
+    service = [ServiceRow(instrument=name, seniority_class=by_name[name], period=label, principal=p, interest=i)
+               for (name, label), (p, i) in rows.items() if p > 1e-9 or i > 1e-9]
+    return service, month_interest, month_principal
 
 
 # --- scenarios, raise, stack, waterfall -------------------------------------------------------
@@ -380,6 +398,20 @@ def _raise(financials: Financials, market: Market, periods, service: list[Servic
     return rows
 
 
+def _refinancing(periods: list[Period], principal: dict[str, float], rate_pct: float | None) -> list[RefinancingRow]:
+    """Maturities refinanced at `rate_pct`, so their interest keeps running instead of falling away. A period
+    pays half a period on what it refinances. Funding for growth capex stays in "cash to raise": borrowing for
+    it without the EBITDA it buys would sink coverage because of the assumption, not the company."""
+    rows, balance = [], 0.0
+    for p in periods:
+        rm = (rate_pct or 0.0) / 100 * p.months / 12
+        due = principal.get(p.label, 0.0)
+        interest = rm * (balance + due / 2)
+        balance += due
+        rows.append(RefinancingRow(period=p.label, refinanced=due, balance=balance, interest=interest))
+    return rows
+
+
 def _stack(instruments: list[Instrument], market: Market) -> list[StackClass]:
     amounts: list[tuple[str, float]] = []
     for cls in SeniorityClass:
@@ -399,14 +431,18 @@ def _stack(instruments: list[Instrument], market: Market) -> list[StackClass]:
     return out
 
 
-def _waterfall(service: list[ServiceRow], scenarios: list[ScenarioRow]) -> list[WaterfallRow]:
-    due: dict[tuple[str, SeniorityClass], float] = defaultdict(float)
+def _waterfall(service: list[ServiceRow], scenarios: list[ScenarioRow],
+               refi_interest: dict[str, float]) -> list[WaterfallRow]:
+    """EBITDA pays each class in seniority order; interest on refinanced maturities (assumed) comes last."""
+    due: dict[tuple[str, str], float] = defaultdict(float)
     for r in service:
         due[(r.period, r.seniority_class)] += r.principal + r.interest
+    for period, amount in refi_interest.items():
+        due[(period, "refinanced")] += amount
     rows = []
     for s in scenarios:
         remaining = max(s.ebitda, 0.0)
-        for cls in SeniorityClass:
+        for cls in [*SeniorityClass, "refinanced"]:
             d = due.get((s.period, cls), 0.0)
             if d <= 0:
                 continue
@@ -415,3 +451,97 @@ def _waterfall(service: list[ServiceRow], scenarios: list[ScenarioRow]) -> list[
             rows.append(WaterfallRow(period=s.period, scenario=s.scenario, seniority_class=cls, due=d, paid=paid,
                                      shortfall=d - paid))
     return rows
+
+
+# --- headline: can it pay its interest ---------------------------------------------------------
+
+COVERED, THIN = 2.0, 1.0  # interest covered at least 2x reads as comfortable; under 1x is not covered
+LIQUIDITY_COVERED = 1.5
+
+
+def status_for(value: float | None, covered: float = COVERED, thin: float = THIN) -> str:
+    if value is None:
+        return "n/a"
+    return "covered" if value >= covered else "thin" if value >= thin else "not_covered"
+
+
+def _money(m: float | None) -> str:
+    if m is None:
+        return "—"
+    sign, a = ("−" if m < 0 else ""), abs(m)
+    return f"{sign}${a / 1000:.1f}B" if a >= 1000 else f"{sign}${a:.0f}M"
+
+
+def _first_months(values: list[float], n: int = 12) -> float | None:
+    return sum(values[:n]) if values else None
+
+
+def _headline(financials: Financials, periods: list[Period], month_interest: list[float],
+              month_principal: list[float], refinancing: list[RefinancingRow], refi_rate: float | None,
+              outstanding: list[Instrument], undrawn_revolver: float | None) -> Headline:
+    t = financials.ttm
+    i12, p12 = _first_months(month_interest), _first_months(month_principal)
+    refi12, left = 0.0, 12
+    by_period = {r.period: r.interest for r in refinancing}
+    for p in periods:
+        if left <= 0:
+            break
+        take = min(left, p.months)
+        refi12 += by_period.get(p.label, 0.0) * take / p.months
+        left -= take
+    # Liquidity counts revolvers only: a delayed-draw loan's commitment less its balance is mostly principal
+    # already repaid, or money tied to specific purchases.
+    undrawn = undrawn_revolver if undrawn_revolver is not None else sum(
+        max(0.0, i.commitment - (i.principal or 0) - (i.post_period_change or 0)) for i in outstanding
+        if i.kind == "revolver" and i.commitment is not None)
+    cash = financials.cash.value
+    liquidity = None if cash is None else cash + undrawn
+    incurred = None if t.interest_expense is None else t.interest_expense + (t.interest_capitalized or 0)
+    paid = t.interest_paid if t.interest_paid is not None else t.interest_expense  # added back to CFO
+    ratio = lambda a, b: None if a is None or not b else a / b
+    cfo_pre = None if t.cfo is None or paid is None else t.cfo + paid
+    fcf_pre = None if cfo_pre is None or t.capex is None else cfo_pre - t.capex
+    e, c, f = ratio(t.ebitda, i12), ratio(cfo_pre, i12), ratio(fcf_pre, i12)
+    liq = ratio(liquidity, (i12 or 0) + (p12 or 0))
+    paid_note = "" if t.interest_paid is not None else " (interest expense used for interest paid)"
+    tests = [
+        CoverageTest(key="ebitda_to_next12m_interest", label="Earnings", value=e, status=status_for(e),
+                     detail=f"EBITDA {_money(t.ebitda)} (TTM) ÷ next-12-month interest {_money(i12)}"),
+        CoverageTest(key="cfo_plus_interest_to_interest", label="Operating cash flow", value=c, status=status_for(c),
+                     detail=f"operating cash flow before interest {_money(cfo_pre)} (TTM){paid_note}"),
+        CoverageTest(key="fcf_plus_interest_to_interest", label="After capex", value=f, status=status_for(f),
+                     detail=f"the same less capex {_money(t.capex)}: {_money(fcf_pre)}"),
+        CoverageTest(key="liquidity_to_next12m_debt_service", label="Liquidity", value=liq,
+                     status=status_for(liq, LIQUIDITY_COVERED),
+                     detail=f"cash {_money(cash)}" + (f" + undrawn {_money(undrawn)}" if undrawn else "") +
+                            f" ÷ next-12-month interest and principal {_money((i12 or 0) + (p12 or 0))}"),
+    ]
+    return Headline(next12m_interest=i12, next12m_principal=p12, next12m_refinancing_interest=refi12,
+                    refinancing_rate_pct=refi_rate, ttm_interest_incurred=incurred, ttm_interest_paid=t.interest_paid,
+                    undrawn=undrawn, liquidity=liquidity, tests=tests,
+                    takeaway=_takeaway(i12, p12, e, c, f, liq, t.capex, fcf_pre, liquidity, undrawn, refi12, refi_rate))
+
+
+def _takeaway(i12, p12, e, c, f, liq, capex, fcf_pre, liquidity, undrawn, refi12, rate) -> str:
+    if not i12:
+        return "No interest is scheduled on today's debt over the next 12 months."
+    parts = [f"Next 12 months: {_money(i12)} of interest on today's debt and {_money(p12)} of scheduled principal."]
+    by = [f"{x:.1f}x by {name}" for x, name in ((e, "EBITDA"), (c, "operating cash flow")) if x is not None]
+    if by:
+        parts.append("Interest is covered " + " and ".join(by) + ".")
+    if f is not None:
+        if f >= THIN:
+            parts.append(f"After {_money(capex)} of capex it is still covered {f:.1f}x.")
+        elif f >= 0:
+            parts.append(f"After {_money(capex)} of capex it is not covered ({f:.1f}x), so part of it depends on new "
+                         "funding.")
+        else:
+            parts.append(f"After {_money(capex)} of capex it is not covered: cash flow before interest is "
+                         f"{_money(fcf_pre)}, so interest depends on new funding.")
+    if liq is not None:
+        source = "Cash and undrawn facilities of {} cover" if undrawn else "Cash of {} covers"
+        parts.append(source.format(_money(liquidity)) + f" {liq:.1f}x the next 12 months of interest and principal.")
+    if refi12 > 0.5 and rate:
+        parts.append(f"Refinancing the principal due in that time at {rate:.1f}% (assumed) would add about "
+                     f"{_money(refi12)} of interest.")
+    return " ".join(parts)

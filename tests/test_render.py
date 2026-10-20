@@ -81,3 +81,15 @@ def test_basis_lines_shown_as_info():
                                                           "Balances are as of 2026-06-30 from 6-K <x>."]})
     html = render(d)
     assert html.count('class="cw-info"') == 2 and "6-K &lt;x&gt;" in html
+
+
+def test_top_card_answers_coverage_without_market_data():
+    html = render(sample_dashboard())  # no CDS or bond yields in the sample
+    top = html[html.index('id="risk"'):html.index('id="kpis"')]
+    for label in ("Earnings", "Operating cash flow", "After capex", "Liquidity"):
+        assert label in top
+    assert "covered 8.2x by EBITDA" in top and "Not covered" in top
+
+
+def test_interest_kpi_is_forward_looking():
+    assert "Interest, next 12 months" in render(sample_dashboard())

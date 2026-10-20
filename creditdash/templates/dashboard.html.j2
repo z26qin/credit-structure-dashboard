@@ -26,24 +26,48 @@
     <p class="cw-note">Debt per the {{ d.filing.form }} filed {{ d.filing.filed }} ({{ d.filing.accession }}){% if d.extraction and d.extraction.instruments | selectattr("post_period_change") | list %}, pro forma for changes after the period end{% endif %}. Money in US dollars; built {{ d.built_at.strftime("%Y-%m-%d %H:%M") }}.</p>
   </header>
 
-  {% set r = d.risk %}
-  <section class="cw-risk{% if r and r.assessment %} is-{{ r.assessment.verdict }}{% endif %}" id="risk" aria-label="Market-implied default risk">
+  {% set r = d.risk %}{% set h = d.model.headline %}
+  {% set VERDICT = {"overreaction": "Looks like an overreaction", "fair": "Price roughly fits the cash flow", "underpricing": "Market may be underpricing risk", "unclear": "Unclear"} %}
+  {% set STATUS = {"covered": "Covered", "thin": "Thin", "not_covered": "Not covered", "n/a": "No data"} %}
+  <section class="cw-risk{% if r and r.assessment %} is-{{ r.assessment.verdict }}{% endif %}" id="risk" aria-label="Market-implied default risk vs cash flow">
     <div class="cw-risk-head">
       <h2>Market-implied default risk vs cash flow</h2>
-      {% if r and r.assessment %}<span class="cw-verdict">{{ {"overreaction": "Looks like an overreaction", "fair": "Price roughly fits the cash flow", "underpricing": "Market may be underpricing risk", "unclear": "Unclear"}[r.assessment.verdict] }}</span>{% endif %}
+      {% if r and r.assessment %}<span class="cw-verdict">{{ VERDICT[r.assessment.verdict] }}</span>{% endif %}
     </div>
-    {% if r and r.implied %}
-    <div class="cw-risk-nums">
-      <div><span class="cw-kpi-label">Implied default, 1 year</span><span class="cw-kpi-value">{{ "%.1f"|format(r.implied.pd_1y * 100) }}%</span></div>
-      <div><span class="cw-kpi-label">Implied default, 5 years</span><span class="cw-kpi-value">{{ "%.1f"|format(r.implied.pd_5y * 100) }}%</span></div>
-      <div><span class="cw-kpi-label">Spread</span><span class="cw-kpi-value">{{ "%.0f"|format(r.implied.spread_bps) }} bp</span><span class="cw-kpi-sub">{{ r.implied.basis }} · recovery {{ "%.0f"|format(r.implied.recovery * 100) }}%</span></div>
-      {% set e = r.metrics.ebitda_to_next12m_interest %}{% set c = r.metrics.cfo_plus_interest_to_interest %}
-      <div><span class="cw-kpi-label">EBITDA ÷ next-12m interest</span><span class="cw-kpi-value">{{ "%.1fx"|format(e) if e is not none else "—" }}</span><span class="cw-kpi-sub">operating cash flow covers interest {{ "%.1fx"|format(c) if c is not none else "—" }}</span></div>
+    <div class="cw-risk-cols">
+      <div class="cw-risk-col">
+        <h3>What the market prices</h3>
+        {% if r and r.implied %}
+        <div class="cw-risk-nums">
+          <div><span class="cw-kpi-label">Implied default, 1 year</span><span class="cw-kpi-value">{{ "%.1f"|format(r.implied.pd_1y * 100) }}%</span></div>
+          <div><span class="cw-kpi-label">Implied default, 5 years</span><span class="cw-kpi-value">{{ "%.1f"|format(r.implied.pd_5y * 100) }}%</span></div>
+          <div><span class="cw-kpi-label">Spread</span><span class="cw-kpi-value">{{ "%.0f"|format(r.implied.spread_bps) }} bp</span><span class="cw-kpi-sub">{{ r.implied.basis }} · recovery {{ "%.0f"|format(r.implied.recovery * 100) }}%</span></div>
+        </div>
+        {% else %}
+        <p class="cw-note">No CDS or bond yield given: add <code>cds_5y_bps</code> or <code>bond_yields</code> to overrides/{{ d.company.ticker }}.yaml to compare with the market.</p>
+        {% endif %}
+      </div>
+      {% if h %}
+      <div class="cw-risk-col">
+        <h3>Can it pay its interest? Next 12 months</h3>
+        <div class="cw-tests">
+          {% for t in h.tests %}
+          <div class="cw-test">
+            <span class="cw-kpi-label">{{ t.label }}</span>
+            <span class="cw-kpi-value">{{ "%.1fx"|format(t.value) if t.value is not none else "—" }}</span>
+            <span class="cw-status is-{{ t.status }}">{{ STATUS[t.status] }}</span>
+            <span class="cw-kpi-sub">{{ t.detail }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
-    {% if r and r.assessment %}<p class="cw-risk-text">{{ r.assessment.summary }}</p>
-    <p class="cw-note">Read by the model from the figures above and the coverage numbers on this page only (cited: {{ r.assessment.cited | join(", ") }}). Implied probability assumes a flat hazard rate; a single bond's yield can also reflect convertible terms or thin trading.</p>{% endif %}
-    {% if r and r.note %}<p class="cw-note">{{ r.note }}</p>{% endif %}
+    {% if h %}<p class="cw-risk-text">{{ h.takeaway }}</p>{% endif %}
+    {% if r and r.assessment %}<p class="cw-risk-text"><b>The model's read:</b> {{ r.assessment.summary }}</p>
+    <p class="cw-note">Read by the model from the figures in this card only (cited: {{ r.assessment.cited | join(", ") }}). Implied probability assumes a flat hazard rate; a single bond's yield can also reflect convertible terms or thin trading. Covered means at least 2.0x (liquidity 1.5x), thin at least 1.0x.</p>
+    {% elif h %}<p class="cw-note">Covered means at least 2.0x (liquidity 1.5x), thin at least 1.0x. Interest is the coupon on today's debt over the next 12 months; operating cash flow is trailing twelve months with interest paid added back.</p>{% endif %}
+    {% if r and r.note and r.implied %}<p class="cw-note">{{ r.note }}</p>{% endif %}
   </section>
 
   <section class="cw-kpis" id="kpis" aria-label="Headline figures"></section>
@@ -72,14 +96,15 @@
   <h2 class="cw-h2">When the payouts hit the wall</h2>
   <section class="cw-card" id="wall">
     <h3>Payout wall vs EBITDA</h3>
-    <p class="cw-note">Interest plus scheduled principal on today's debt by fiscal year, stacked senior (bottom) to junior. The line is EBITDA under the chosen scenario; a red bracket marks payout it does not cover. Click a year to open its waterfall.</p>
+    <div class="cw-seg" role="group" aria-label="What the wall shows" id="wall-mode"></div>
+    <p class="cw-note" id="wall-note">Interest plus scheduled principal on today's debt by fiscal year, stacked senior (bottom) to junior. The line is EBITDA under the chosen scenario; a red bracket marks payout it does not cover. Click a year to open its waterfall.</p>
     <div class="cw-chart" id="wall-chart"></div>
     <div class="cw-legend" id="wall-legend"></div>
   </section>
   <div class="cw-grid">
     <section class="cw-card" id="coverage">
-      <h3>Debt-service coverage by scenario</h3>
-      <p class="cw-note">EBITDA ÷ (interest + scheduled principal) under each scenario. Below 1.0x the gap has to be refinanced or raised.</p>
+      <h3>Coverage, scenario chosen above</h3>
+      <p class="cw-note">EBITDA ÷ each year's interest, assuming maturities are refinanced at today's average rate so their interest keeps running. The dashed line counts today's debt only and climbs as it matures; the gray line adds scheduled principal. Below 1.0x the gap has to be refinanced or raised.</p>
       <div class="cw-chart" id="coverage-chart"></div>
       <div class="cw-legend" id="coverage-legend"></div>
     </section>

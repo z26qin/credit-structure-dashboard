@@ -3,3 +3,4 @@ stress_haircut: 0.30   # stress scenario: base EBITDA × (1 − haircut) from FY
 horizon_years: 10      # last modeled fiscal year = min(latest maturity, FY + horizon)
 ipf_max_rounds: 50     # rounds for fitting amortizing loans to the reported maturity schedule
 recovery_rate: 0.40    # assumed recovery for market-implied default probability
+# refinancing_rate_pct: 9.0  # rate maturities are refinanced at; default: today's average rate

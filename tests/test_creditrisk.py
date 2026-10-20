@@ -26,12 +26,13 @@ def test_no_market_input():
     assert v.implied is None and "cds_5y_bps" in v.note
 
 
-def test_metrics_use_next_12_month_interest():
+def test_metrics_come_from_the_model_headline():
     out = run_model(TOY, FIN, MKT, SETTINGS)
     m = metrics(FIN, out)
-    first_half = sum(r.interest for r in out.debt_service if r.period == "2H26")
-    assert m["next12m_interest"] == approx(first_half * 2)
-    assert m["ebitda_to_next12m_interest"] == approx(500 / (first_half * 2))
+    assert m["next12m_interest"] == approx(out.headline.next12m_interest)
+    assert m["ebitda_to_next12m_interest"] == approx(500 / out.headline.next12m_interest)
+    assert m["liquidity_to_next12m_debt_service"] == approx(
+        next(t.value for t in out.headline.tests if t.key == "liquidity_to_next12m_debt_service"))
 
 
 def fake(result=None, error=None):

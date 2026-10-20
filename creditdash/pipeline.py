@@ -87,7 +87,7 @@ def build(ticker: str, *, settings: Settings, refresh: bool = False, no_llm: boo
 
     progress("model")
     model_settings = model_settings or load_model_settings()
-    model = run_model(instruments, financials, market, model_settings)
+    model = run_model(instruments, financials, market, model_settings, undrawn_revolver=reconciliation.undrawn_revolver)
     reconciliation.fit_error = model.fit_error
     risk = risk_view(financials, model, market, model_settings.recovery_rate, use_llm=not no_llm, ask=ask,
                      settings=settings, use_cache=not refresh)

@@ -84,6 +84,7 @@ class Quarter(BaseModel):
     interest_paid: float | None
     cfo: float | None
     capex: float | None
+    interest_capitalized: float | None = None  # interest added to assets under construction
 
     @computed_field
     @property
@@ -137,6 +138,7 @@ SENIORITY_LABELS: dict[str, str] = {
     "convertible": "Convertible",
     "other": "Other",
     "equity": "Equity",
+    "refinanced": "Refinanced (assumed)",
 }
 
 
@@ -184,6 +186,9 @@ class Extraction(BaseModel):
     period_end: date
     unit_note: str
     instruments: list[Instrument]
+    undrawn_revolver: float | None = Field(default=None, description="$ millions still available to draw under "
+                                           "revolving credit facilities at period end, when the text states it")
+    undrawn_revolver_quote: str | None = Field(default=None, description="the sentence stating it, verbatim")
 
     @classmethod
     def llm_schema(cls) -> dict:
@@ -214,6 +219,7 @@ class Reconciliation(BaseModel):
     unverified: list[str] = []
     maturity_diff: list[dict] = []
     fit_error: float | None = None
+    undrawn_revolver: float | None = None  # stated availability, kept only when its quote checks out
     notes: list[str] = []
 
 
@@ -263,7 +269,9 @@ class ScenarioRow(BaseModel):
 class CoverageRow(BaseModel):
     scenario: str
     period: str
-    dscr: float | None
+    dscr: float | None  # EBITDA ÷ (interest + scheduled principal) on today's debt
+    icr: float | None = None  # EBITDA ÷ interest on today's debt
+    icr_refi: float | None = None  # EBITDA ÷ (interest on today's debt + on refinanced maturities, assumed)
 
 
 class RaiseRow(BaseModel):
@@ -272,6 +280,14 @@ class RaiseRow(BaseModel):
     principal: float
     cfo: float
     to_raise: float
+
+
+class RefinancingRow(BaseModel):
+    """Maturities of today's debt refinanced at the assumed rate: their interest keeps running."""
+    period: str
+    refinanced: float  # principal falling due this period, rolled into new debt
+    balance: float  # refinanced so far, at period end
+    interest: float
 
 
 class StackClass(BaseModel):
@@ -285,10 +301,32 @@ class StackClass(BaseModel):
 class WaterfallRow(BaseModel):
     period: str
     scenario: str
-    seniority_class: SeniorityClass
+    seniority_class: SeniorityClass | Literal["refinanced"]
     due: float
     paid: float
     shortfall: float
+
+
+class CoverageTest(BaseModel):
+    key: str
+    label: str
+    value: float | None
+    status: Literal["covered", "thin", "not_covered", "n/a"]
+    detail: str
+
+
+class Headline(BaseModel):
+    """Can the company pay its interest over the next twelve months, from earnings, cash flow and liquidity."""
+    next12m_interest: float | None  # coupons on today's debt over the first twelve modeled months
+    next12m_principal: float | None
+    next12m_refinancing_interest: float  # on maturities refinanced at `refinancing_rate_pct` (an assumption)
+    refinancing_rate_pct: float | None
+    ttm_interest_incurred: float | None  # interest expense + capitalized interest
+    ttm_interest_paid: float | None
+    undrawn: float  # committed, undrawn revolvers
+    liquidity: float | None  # cash + undrawn
+    tests: list[CoverageTest]
+    takeaway: str
 
 
 class ModelOutput(BaseModel):
@@ -297,10 +335,12 @@ class ModelOutput(BaseModel):
     scenarios: list[ScenarioRow]
     coverage: list[CoverageRow]
     raise_rows: list[RaiseRow]
+    refinancing: list[RefinancingRow] = []
     stack: list[StackClass]
     waterfall: list[WaterfallRow]
     excluded: list[str]
     fit_error: float | None
+    headline: Headline | None = None
 
 
 class Dashboard(BaseModel):

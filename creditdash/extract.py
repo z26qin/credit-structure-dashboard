@@ -14,7 +14,7 @@ from .errors import LlmError
 from .footnote import debt_note_from_html, debt_note_from_instance, eight_k_items
 from .models import Extraction, Resolved
 
-PROMPT_VERSION = "extract_v5"
+PROMPT_VERSION = "extract_v6"
 PROMPT_FILE = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 MAX_6K_CHARS = 24_000
 

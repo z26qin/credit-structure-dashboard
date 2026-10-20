@@ -186,3 +186,93 @@ def test_raise_needs_capex():
 def test_floating_without_sofr_is_flagged_as_unmodeled_interest():
     out = run_model(TOY, FIN, market(sofr=None), SETTINGS)
     assert "B (no rate: interest not modeled)" in out.excluded
+
+
+# --- headline coverage, new borrowing ---------------------------------------------------------------
+
+def test_headline_next_12_months_from_the_monthly_schedule(out):
+    h = out.headline
+    # A 15 (Jul–Jun at 5%), B 10.75 + 8.375 (6% on a balance paying 100 then 100/yr), C 27 (9% all year)
+    assert h.next12m_interest == approx(61.125, abs=0.01)
+    assert h.next12m_principal == approx(450, abs=0.01)  # A 300 in Jun 2027, B 100 in 2H26 + 50 in 1H27
+
+
+def test_headline_tests_and_statuses(out):
+    t = {x.key: x for x in out.headline.tests}
+    assert [x.key for x in out.headline.tests] == [
+        "ebitda_to_next12m_interest", "cfo_plus_interest_to_interest", "fcf_plus_interest_to_interest",
+        "liquidity_to_next12m_debt_service"]
+    assert t["ebitda_to_next12m_interest"].value == approx(500 / 61.125, abs=0.01)
+    assert t["ebitda_to_next12m_interest"].status == "covered"
+    assert t["cfo_plus_interest_to_interest"].value == approx((240 + 18) / 61.125, abs=0.01)
+    assert t["fcf_plus_interest_to_interest"].value == approx((240 + 18 - 200) / 61.125, abs=0.01)
+    assert t["fcf_plus_interest_to_interest"].status == "not_covered"
+    assert t["liquidity_to_next12m_debt_service"].value == approx(150 / (61.125 + 450), abs=0.01)
+    assert "covered 8.2x by EBITDA" in out.headline.takeaway and "not covered" in out.headline.takeaway
+    assert "Cash of $150M covers 0.3x" in out.headline.takeaway
+
+
+def test_thin_status_between_one_and_two():
+    from creditdash.model import status_for
+    assert (status_for(2.0), status_for(1.5), status_for(0.99), status_for(None)) == \
+        ("covered", "thin", "not_covered", "n/a")
+
+
+def test_undrawn_commitments_count_as_liquidity():
+    revolver = inst("Revolver", 20, maturity="2029-11", seniority="parent_secured", amortization="bullet", fixed=7.0)
+    revolver = revolver.model_copy(update={"kind": "revolver", "commitment": 100.0})
+    h = run_model(TOY + [revolver], FIN, MKT, SETTINGS).headline
+    assert (h.undrawn, h.liquidity) == (approx(80), approx(150 + 80))
+
+
+def test_ttm_interest_incurred_adds_capitalized():
+    fin = FIN.model_copy(update={"ttm": FIN.ttm.model_copy(update={"interest_capitalized": 5.0})})
+    assert run_model(TOY, fin, MKT, SETTINGS).headline.ttm_interest_incurred == approx(25.0)
+
+
+def test_refinanced_maturities_keep_paying_interest(out):
+    # Maturities of today's debt are refinanced at its average rate, (300×5 + 400×6 + 300×9) / 1000 = 6.6%:
+    # a period pays half a period on what it refinances and a full period on what was refinanced before.
+    refi = {x.period: x for x in out.refinancing}
+    paid = {p: sum(r.principal for r in out.debt_service if r.period == p) for p in ("2H26", "2027")}
+    assert refi["2H26"].interest == approx(0.066 * 0.5 * paid["2H26"] / 2)
+    assert refi["2027"].interest == approx(0.066 * (paid["2H26"] + paid["2027"] / 2))
+    assert refi["2027"].balance == approx(paid["2H26"] + paid["2027"])
+    assert out.headline.refinancing_rate_pct == approx(6.6)
+
+
+def test_cash_to_raise_is_capex_plus_principal_less_cfo(out):
+    r = {x.period: x for x in out.raise_rows}["2027"]
+    assert r.to_raise == approx(200 + r.principal - 240)
+
+
+def test_coverage_rows_carry_three_measures(out):
+    c = {(x.scenario, x.period): x for x in out.coverage}["ttm", "2027"]
+    existing = sum(x.interest for x in out.debt_service if x.period == "2027")
+    principal = sum(x.principal for x in out.debt_service if x.period == "2027")
+    refi = {x.period: x for x in out.refinancing}["2027"].interest
+    assert c.icr == approx(500 / existing) and c.icr_refi == approx(500 / (existing + refi))
+    assert c.dscr == approx(500 / (existing + principal))
+
+
+def test_waterfall_ends_with_refinanced_interest(out):
+    rows = [x for x in out.waterfall if (x.period, x.scenario) == ("2027", "ttm")]
+    assert rows[-1].seniority_class == "refinanced"
+    assert rows[-1].due == approx({x.period: x for x in out.refinancing}["2027"].interest)
+
+
+def test_refinancing_rate_override():
+    s = SETTINGS.model_copy(update={"refinancing_rate_pct": 10.0})
+    assert run_model(TOY, FIN, MKT, s).headline.refinancing_rate_pct == 10.0
+
+
+def test_delayed_draw_commitments_are_not_liquidity():
+    # A DDTL's commitment less its balance is mostly principal already repaid, or money tied to specific purchases.
+    ddtl = inst("DDTL", 100, maturity="2030-01", seniority="asset_level_secured", amortization="amortizing", fixed=8.0)
+    ddtl = ddtl.model_copy(update={"kind": "delayed_draw_term_loan", "commitment": 500.0})
+    assert run_model(TOY + [ddtl], FIN, MKT, SETTINGS).headline.undrawn == 0
+
+
+def test_stated_revolver_availability_wins():
+    h = run_model(TOY, FIN, MKT, SETTINGS, undrawn_revolver=300.0).headline
+    assert (h.undrawn, h.liquidity) == (300.0, 450.0)
