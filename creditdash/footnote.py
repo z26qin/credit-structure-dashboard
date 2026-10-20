@@ -12,8 +12,10 @@ from bs4 import BeautifulSoup, NavigableString, XMLParsedAsHTMLWarning
 
 TEXT_BLOCKS = ("LongTermDebtTextBlock", "DebtDisclosureTextBlock", "DebtTextBlock")
 BLOCKS = ["p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "section", "article"]
-DEBT_HEADING = re.compile(r"^(note\s*)?\d*\.?\s*(debt|borrowings|long-term debt|notes payable)\b", re.I)
+DEBT_HEADING = re.compile(r"^(note\s*)?\d*\.?\s*(debt|borrowings|long-term debt|notes payable|indebtedness|"
+                          r"convertible (debt|notes|senior notes))\b", re.I)
 NOTE_HEADING = re.compile(r"^(note\s*)?\d+\.\s+\w", re.I)
+NOTE_NUMBER = re.compile(r"^(note\s*)?\d+\.\s*", re.I)
 ITEM_HEADING = re.compile(r"^Item\s+(\d\.\d\d)\b", re.I)
 MIN_SECTION_CHARS = 200  # shorter matches are table-of-contents entries
 JOIN_RIGHT = {"$", "€", "£", "("}
@@ -71,13 +73,23 @@ def debt_note_from_instance(instance_xml: str) -> str | None:
     return None
 
 
+def _plain(line: str) -> str:
+    """A line as a heading reads: table pipes and zero-width spaces removed ("| 12. | CONVERTIBLE DEBT |")."""
+    return re.sub(r"\s+", " ", line.replace("|", " ").replace("\u200b", " ")).strip()
+
+
+def _is_heading(line: str, pattern: re.Pattern) -> bool:
+    text = _plain(line)
+    # a heading has no figures after its note number, unlike a balance-sheet row such as "Debt, current 24.5"
+    return len(text) <= 80 and bool(pattern.match(text)) and not re.search(r"\d", NOTE_NUMBER.sub("", text))
+
+
 def debt_note_from_html(filing_html: str) -> str | None:
     lines = html_to_text(filing_html).splitlines()
     sections: list[list[str]] = []
     for i, line in enumerate(lines):
-        if len(line) <= 80 and DEBT_HEADING.match(line):
-            end = next((j for j in range(i + 1, len(lines))
-                        if len(lines[j]) <= 80 and NOTE_HEADING.match(lines[j])), len(lines))
+        if _is_heading(line, DEBT_HEADING):
+            end = next((j for j in range(i + 1, len(lines)) if _is_heading(lines[j], NOTE_HEADING)), len(lines))
             sections.append(lines[i:end])
     if not sections:
         return None

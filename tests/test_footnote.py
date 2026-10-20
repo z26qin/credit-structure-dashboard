@@ -54,3 +54,19 @@ def test_eight_k_items():
 def test_eight_k_items_only_wanted():
     t = eight_k_items((FIXTURES / "8k-20260917.htm").read_text())
     assert t.startswith("Item 1.01") and "Item 3.02" not in t and "Item 8.01" not in t
+
+
+def test_debt_note_heading_inside_a_table_row():  # 6-K exhibits put note numbers in table cells
+    html = ("<table><tr><td>11.</td><td>COMMITMENTS</td></tr></table><p>x</p>"
+            "<table><tr><td>12.</td><td>CONVERTIBLE DEBT</td></tr></table>"
+            + "<p>The Notes due March 2031 bear interest at 1.25% per year, payable semi-annually.</p>" * 5 +
+            "<table><tr><td>13.</td><td>SHARE-BASED COMPENSATION</td></tr></table><p>y</p>")
+    t = debt_note_from_html(html)
+    assert t.startswith("| 12. | CONVERTIBLE DEBT |") and "March 2031" in t and "SHARE-BASED" not in t
+
+
+def test_nbis_6k_debt_note():
+    html = (FIXTURES.parent / "nbis" / "6k-20260812-ex99d2.htm").read_text()
+    t = debt_note_from_html(html)
+    assert t.startswith("| 12. | CONVERTIBLE DEBT |") and "Notes due March 2031" in t
+    assert "BALANCE SHEETS" not in t

@@ -152,3 +152,18 @@ def test_carrying_amount_for_one_note_is_not_total_debt():
     }}}
     total = build_financials(facts, "<xbrl/>", date(2026, 6, 30), "1231", "x").total_debt
     assert total.value == 5000.0 and total.tag == "LongTermDebt" and "DebtInstrumentCarryingAmount" in total.note
+
+
+NBIS = FIXTURES.parent / "nbis"
+
+
+def test_20f_annual_only_uses_the_fiscal_year_as_ttm():
+    facts = json.loads((NBIS / "companyfacts.json").read_text())
+    fin = build_financials(facts, (NBIS / "instance-20f.xml").read_text(), date(2025, 12, 31), "1231",
+                           "0001104659-26-052948")
+    t = fin.ttm
+    assert t.label == "FY25"
+    assert (t.revenue, t.operating_income, t.da, t.interest_expense, t.cfo, t.capex) == \
+        (529.8, -611.7, 417.9, 61.5, 384.8, 4066.0)
+    assert fin.total_debt.value == 4836.8 and fin.cash.value == 3721.6
+    assert fin.shares_outstanding.value > 200e6

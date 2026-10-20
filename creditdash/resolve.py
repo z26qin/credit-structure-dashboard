@@ -1,4 +1,4 @@
-"""Ticker -> company, its latest 10-Q/10-K, and the debt 8-Ks filed since that period ended."""
+"""Ticker -> company, its latest 10-Q/10-K (or 20-F), and the filings since that may change its debt."""
 from __future__ import annotations
 
 from datetime import date
@@ -7,10 +7,11 @@ from .edgar import TICKERS_URL, Edgar, submissions_url
 from .errors import UnknownTicker, UnsupportedFiler
 from .models import Company, Filing, Resolved
 
-PERIODIC = ("10-Q", "10-K")
-FOREIGN = ("20-F", "40-F")
+PERIODIC = ("10-Q", "10-K", "20-F")
+UNSUPPORTED = ("40-F",)
 DEBT_ITEMS = ("1.01", "2.03")
 TICKERS_MAX_AGE_S = 7 * 86400
+MAX_6KS = 30
 
 
 def resolve(ticker: str, edgar: Edgar) -> Resolved:
@@ -24,11 +25,19 @@ def resolve(ticker: str, edgar: Edgar) -> Resolved:
 
     subs = edgar.json(submissions_url(cik), home / str(cik) / "submissions.json", 0)
     filings = _filings(subs["filings"]["recent"])
-    newest = max((f for f in filings if f.form in PERIODIC + FOREIGN), key=lambda f: f.filed, default=None)
+    name = subs.get("name") or row["title"]
+    newest = max((f for f in filings if f.form in PERIODIC + UNSUPPORTED), key=lambda f: f.filed, default=None)
     if newest is None:
-        raise UnsupportedFiler(f"{symbol} has no 10-Q or 10-K on EDGAR")
-    if newest.form in FOREIGN:
-        raise UnsupportedFiler(f"{symbol} files {newest.form}; v1 supports 10-Q/10-K filers only")
+        raise UnsupportedFiler(f"{symbol} ({name}) has no 10-K, 10-Q or 20-F on EDGAR")
+    if newest.form in UNSUPPORTED:
+        raise UnsupportedFiler(f"{symbol} ({name}) files {newest.form}, the Canadian cross-border annual report "
+                               f"(latest filed {newest.filed}); creditdash supports 10-K/10-Q filers and "
+                               "20-F filers that report in US GAAP.")
+    if newest.form == "20-F":  # a foreign private issuer: quarterly results arrive on 6-K, without XBRL
+        sixks = sorted((f for f in filings if f.form == "6-K" and f.filed > newest.period_end),
+                       key=lambda f: f.filed, reverse=True)[:MAX_6KS]
+        company = Company(ticker=symbol, cik=cik, name=name, fiscal_year_end=subs.get("fiscalYearEnd") or "1231")
+        return Resolved(company=company, periodic=newest, debt_8ks=[], sixks=sixks)
 
     debt_8ks = sorted((f for f in filings if f.form == "8-K" and f.filed > newest.period_end
                        and any(i in f.items for i in DEBT_ITEMS)), key=lambda f: f.filed)
@@ -36,8 +45,7 @@ def resolve(ticker: str, edgar: Edgar) -> Resolved:
     if newest.form == "10-Q":
         annual = max((f for f in filings if f.form == "10-K" and f.filed <= newest.filed), key=lambda f: f.filed,
                      default=None)
-    company = Company(ticker=symbol, cik=cik, name=subs.get("name") or row["title"],
-                      fiscal_year_end=subs.get("fiscalYearEnd") or "1231")
+    company = Company(ticker=symbol, cik=cik, name=name, fiscal_year_end=subs.get("fiscalYearEnd") or "1231")
     return Resolved(company=company, periodic=newest, debt_8ks=debt_8ks, annual=annual)
 
 

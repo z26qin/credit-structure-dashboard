@@ -152,6 +152,9 @@ def build_financials(companyfacts: dict, instance_xml: str, period_end: date, fi
     """`annual_end`: the latest 10-K's period end, whose maturity schedule is used when the 10-Q has none."""
     total_debt = _total_debt(companyfacts, period_end)
     quarters = _quarters(companyfacts, period_end, fiscal_year_end)
+    ttm = _ttm(quarters, period_end)
+    if ttm.revenue is None and ttm.operating_income is None:  # a 20-F filer tags only full years
+        ttm = _fiscal_year(companyfacts, period_end, fiscal_year_end) or ttm
     maturities, as_of = _maturities(companyfacts, period_end, fiscal_year_end, total_debt.value, annual_end)
     return Financials(
         period_end=period_end,
@@ -166,7 +169,7 @@ def build_financials(companyfacts: dict, instance_xml: str, period_end: date, fi
         maturities=maturities,
         maturities_as_of=as_of,
         quarters=quarters,
-        ttm=_ttm(quarters, period_end),
+        ttm=ttm,
     )
 
 
@@ -282,6 +285,25 @@ def _quarters(facts: dict, period_end: date, fiscal_year_end: str) -> list[Quart
         start = _month_end_shift(end, -3) + timedelta(days=1)
         out.append(Quarter(label=quarter_label(end, fiscal_year_end), start=start, end=end, **values))
     return out
+
+
+def _fiscal_year(facts: dict, period_end: date, fiscal_year_end: str) -> Quarter | None:
+    """The fiscal year ending at `period_end`, used as the trailing twelve months when there are no quarters."""
+    fy = fiscal_year_of(period_end, fiscal_year_end)
+    start = fiscal_year_start(fy, fiscal_year_end)
+    values = {}
+    for field, sources in FIELDS.items():
+        values[field] = None
+        for source in sources:
+            parts = [(-1 if t.startswith("-") else 1, _find(_durations(facts, t.lstrip("-")), start, period_end,
+                                                             range(350, 381))) for t in source]
+            if parts and all(v is not None for _, v in parts):
+                total = sum(sign * v for sign, v in parts)
+                values[field] = max(total, 0.0) if any(sign < 0 for sign, _ in parts) else total
+                break
+    if values["revenue"] is None and values["operating_income"] is None:
+        return None
+    return Quarter(label=f"FY{fy % 100:02d}", start=start, end=period_end, **values)
 
 
 def _ttm(quarters: list[Quarter], period_end: date) -> Quarter:

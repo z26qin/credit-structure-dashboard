@@ -52,6 +52,7 @@ class Resolved(BaseModel):
     periodic: Filing
     debt_8ks: list[Filing]
     annual: Filing | None = None  # latest 10-K when the periodic filing is a 10-Q
+    sixks: list[Filing] = []  # 20-F filers: 6-Ks filed after the 20-F's period end, newest first
 
 
 # --- reported numbers ------------------------------------------------------------------------
