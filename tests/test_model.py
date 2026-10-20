@@ -52,11 +52,28 @@ def test_stack_without_market_cap():
     assert out.stack[0].attachment == approx(0.6)
 
 
-def test_null_maturity_excluded():
+def test_null_maturity_follows_the_reported_schedule():
+    # Review Focus 1: no crash, not dropped. With no maturity it shares the schedule's residual (here only the
+    # Thereafter years are left over) at its own rate, and stays in the stack.
     out = run_model(TOY + [inst("Revolver", 50, maturity=None, seniority="parent_secured", amortization="bullet",
                                 fixed=7.0)], FIN, MKT, SETTINGS)
-    assert "Revolver" in out.excluded and not any(r.instrument == "Revolver" for r in out.debt_service)
+    assert "Revolver" not in out.excluded
+    assert sum(r.principal for r in out.debt_service if r.instrument == "Revolver") == approx(50)
     assert any(s.label == "Parent secured" and s.amount == 50 for s in out.stack)
+
+
+def test_category_totals_follow_the_schedule_by_balance():  # CHTR reports debt only by category
+    cats = [inst("Senior unsecured notes", 600, maturity=None, seniority="senior_unsecured", amortization="unknown",
+                 rate_type="unknown"),
+            inst("Credit facilities", 400, maturity=None, seniority="parent_secured", amortization="unknown",
+                 rate_type="floating", spread=1.5)]
+    cats[0] = cats[0].model_copy(update={"effective_rate_pct": 5.0})
+    out = run_model(cats, FIN, MKT, SETTINGS)
+    p = principal_by(out)
+    assert p[("Senior unsecured notes", "2027")] == approx(240) and p[("Credit facilities", "2027")] == approx(160)
+    assert out.excluded == []
+    i = interest_by(out)  # same schedule shape, so interest per dollar shows the rate: 5.5% (SOFR 4 + 1.5) vs 5%
+    assert i[("Credit facilities", "2H26")] / 400 == approx(i[("Senior unsecured notes", "2H26")] / 600 * 5.5 / 5)
 
 
 def test_null_principal_excluded():

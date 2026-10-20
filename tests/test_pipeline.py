@@ -52,7 +52,7 @@ def test_build_writes_outputs(settings, transports, tmp_path):
     assert [i.name for i in d.extraction.instruments] == ["DDTL 1.0 Facility", "2030 Senior Notes"]
     assert d.reconciliation.unverified == [] and d.reconciliation.status == ReconStatus.fail  # 2 of ~19 instruments
     assert d.instruments[-1].name == "Unallocated"
-    assert d.settings["llm_model"] == "deepseek-flash" and d.settings["prompt_version"] == "extract_v2"
+    assert d.settings["llm_model"] == "deepseek-flash" and d.settings["prompt_version"] == "extract_v3"
     assert transports["llm_transport"].calls == 1
 
 
@@ -61,7 +61,7 @@ def test_latest_10k_read_for_detail(settings, transports, tmp_path):
     annual_url = "https://www.sec.gov/Archives/edgar/data/1769628/000176962826000104/crwv-20251231_htm.xml"
     assert transports["sec_transport"].calls.count(annual_url) == 1
     d = Dashboard.model_validate_json((path.parent / "dashboard.json").read_text())
-    assert d.settings["prompt_version"] == "extract_v2"
+    assert d.settings["prompt_version"] == "extract_v3"
     assert d.financials.maturities_as_of == date(2026, 6, 30)
 
 

@@ -14,7 +14,7 @@ from .errors import LlmError
 from .footnote import debt_note_from_html, debt_note_from_instance, eight_k_items
 from .models import Extraction, Resolved
 
-PROMPT_VERSION = "extract_v2"
+PROMPT_VERSION = "extract_v3"
 PROMPT_FILE = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 
 

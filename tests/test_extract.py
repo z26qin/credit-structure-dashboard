@@ -67,7 +67,7 @@ def test_system_prompt_rules(resolved, instance_xml, eight_ks, settings):
     extract(resolved, instance_xml, no_html, eight_ks, ask=ask, settings=settings)
     system = ask.calls[0]["system"]
     assert "$ millions" in system and "recorded once" in system and "verbatim" in system
-    assert "annual filing" in system and PROMPT_VERSION == "extract_v2"
+    assert "annual filing" in system and PROMPT_VERSION == "extract_v3"
 
 
 ANNUAL = "0001769628-26-000104"

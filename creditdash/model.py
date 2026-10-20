@@ -85,14 +85,17 @@ def run_model(instruments: list[Instrument], financials: Financials, market: Mar
               settings: ModelSettings) -> ModelOutput:
     excluded: list[str] = []
     loans: list[_Loan] = []
-    gaps = [i for i in instruments if i.source == UNALLOCATED_SOURCE]
+    # No maturity (the unallocated gap, category totals, an undated revolver): these share whatever the
+    # reported schedule leaves after the dated instruments, in proportion to their balances.
+    undated: list[Instrument] = []
     for i in instruments:
-        if i.source == UNALLOCATED_SOURCE:
-            continue
         mat = maturity_date(i.maturity)
         balance = (i.principal or 0) + (i.post_period_change or 0)
-        if mat is None or (i.principal is None and i.post_period_change is None) or balance <= 0:
+        if (i.principal is None and i.post_period_change is None) or balance <= 0:
             excluded.append(i.name)
+            continue
+        if i.source == UNALLOCATED_SOURCE or mat is None:
+            undated.append(i)
             continue
         rate = _rate(i, market.sofr_pct.value)
         if rate is None:
@@ -101,23 +104,32 @@ def run_model(instruments: list[Instrument], financials: Financials, market: Mar
                            maturity=max(mat, financials.period_end + timedelta(days=1)), rate=rate or 0.0,
                            flexible=i.amortization != "bullet"))
 
-    gap_total = sum(i.principal or 0 for i in gaps)
+    balance_of = {id(i): (i.principal or 0) + (i.post_period_change or 0) for i in undated}
+    undated_total = sum(balance_of.values())
     dated = [b.fiscal_year for b in financials.maturities if b.fiscal_year is not None]
-    gap_maturity = (fiscal_year_end_date(max(dated) + GAP_THEREAFTER_YEARS, financials.fiscal_year_end)
-                    if gap_total > 0 and dated else None)
-    last = max([l.maturity for l in loans] + ([gap_maturity] if gap_maturity else []), default=None)
+    spread_until = (fiscal_year_end_date(max(dated) + GAP_THEREAFTER_YEARS, financials.fiscal_year_end)
+                    if undated and dated else None)
+    last = max([l.maturity for l in loans] + ([spread_until] if spread_until else []), default=None)
     periods = build_periods(financials, last, settings.horizon_years)
     months = _month_list(periods)
     label_of = _period_of(periods)
     fit_error = _fit(loans, financials, periods, months, label_of, settings.ipf_max_rounds)
-    if gap_total > 0:
-        rate = _gap_rate(loans, financials)
-        if gap_maturity is None or rate is None:
-            excluded.append(gaps[0].name + (" (no reported maturity schedule)" if gap_maturity is None else " (no rate)"))
+    if undated:
+        if spread_until is None:
+            excluded += [f"{i.name} (no maturity and no reported schedule)" for i in undated]
         else:
-            gap = _Loan(inst=gaps[0], principal=gap_total, post=0.0, maturity=gap_maturity, rate=rate, flexible=True)
-            gap.alloc = _gap_alloc(loans, financials, periods, gap_total, max(dated))
-            loans.append(gap)
+            residual = _gap_alloc(loans, financials, periods, undated_total, max(dated))
+            fallback_rate = _gap_rate(loans, financials)
+            for i in undated:
+                rate = _rate(i, market.sofr_pct.value) if i.source != UNALLOCATED_SOURCE else None
+                rate = rate if rate is not None else fallback_rate
+                if rate is None:
+                    excluded.append(f"{i.name} (no rate)")
+                share = balance_of[id(i)] / undated_total
+                loan = _Loan(inst=i, principal=balance_of[id(i)], post=0.0, maturity=spread_until, rate=rate or 0.0,
+                             flexible=True)
+                loan.alloc = {k: v * share for k, v in residual.items()}
+                loans.append(loan)
     service = _simulate(loans, months, label_of)
 
     scenarios = _scenarios(financials, market, periods, settings)
