@@ -74,6 +74,53 @@ def test_non_calendar_fiscal_year():
     assert fin.shares_outstanding.value is None
 
 
+def test_notes_payable_pair_for_total_debt():  # ORCL tags its balance sheet this way
+    facts = {"facts": {"us-gaap": {
+        "NotesPayableCurrent": {"units": {"USD": [usd(None, "2026-08-31", 7625e6)]}},
+        "LongTermNotesAndLoans": {"units": {"USD": [usd(None, "2026-08-31", 117712e6)]}},
+    }}}
+    fin = build_financials(facts, "<xbrl/>", date(2026, 8, 31), "0531", "x")
+    assert fin.total_debt.value == 125337.0 and fin.total_debt.tag == "LongTermNotesAndLoans+NotesPayableCurrent"
+
+
+def test_split_depreciation_and_amortization():  # ORCL reports the two separately
+    facts = {"facts": {"us-gaap": {
+        "OperatingIncomeLoss": {"units": {"USD": [usd("2026-06-01", "2026-08-31", 5000e6)]}},
+        "Depreciation": {"units": {"USD": [usd("2026-06-01", "2026-08-31", 1500e6)]}},
+        "AmortizationOfIntangibleAssets": {"units": {"USD": [usd("2026-06-01", "2026-08-31", 400e6)]}},
+    }}}
+    fin = build_financials(facts, "<xbrl/>", date(2026, 8, 31), "0531", "x")
+    assert fin.quarters[-1].da == 1900.0
+
+
+def test_net_nonoperating_interest_as_expense():  # CHTR reports interest only as a net non-operating line
+    facts = {"facts": {"us-gaap": {
+        "OperatingIncomeLoss": {"units": {"USD": [usd("2026-04-01", "2026-06-30", 3000e6)]}},
+        "InterestIncomeExpenseNonoperatingNet": {"units": {"USD": [usd("2026-04-01", "2026-06-30", -1300e6)]}},
+    }}}
+    fin = build_financials(facts, "<xbrl/>", date(2026, 6, 30), "1231", "x")
+    assert fin.quarters[-1].interest_expense == 1300.0
+
+
+def test_maturities_fall_back_to_the_annual_schedule():  # CHTR / ORCL: schedule tagged only in the 10-K
+    def at(end, v):
+        return {"units": {"USD": [usd(None, end, v)]}}
+    facts = {"facts": {"us-gaap": {
+        "LongTermDebt": at("2026-06-30", 1000e6),
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalInNextTwelveMonths": at("2025-12-31", 100e6),
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearTwo": at("2025-12-31", 200e6),
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalAfterYearFive": at("2025-12-31", 650e6),
+    }}}
+    fin = build_financials(facts, "<xbrl/>", date(2026, 6, 30), "1231", "x", annual_end=date(2025, 12, 31))
+    assert [(b.label, b.principal, b.months) for b in fin.maturities] == [
+        ("2H26", 100.0, 6), ("2027", 200.0, 12), ("Thereafter", 650.0, 0)]
+    assert fin.maturities_as_of == date(2025, 12, 31)
+
+
+def test_maturities_as_of_period_end_when_tagged(fin):
+    assert fin.maturities_as_of == date(2026, 6, 30)
+
+
 def test_long_term_debt_fallback_does_not_double_count_current():
     facts = {"facts": {"us-gaap": {
         "LongTermDebt": {"units": {"USD": [usd(None, "2026-06-30", 900e6)]}},

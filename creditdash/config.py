@@ -28,6 +28,7 @@ class Settings:
     llm_base_url: str
     llm_model: str
     llm_max_input_tokens: int
+    llm_reasoning_effort: str = "low"
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -43,6 +44,7 @@ class Settings:
             llm_base_url=env.get("LLM_BASE_URL", "https://api.deepseek.com").rstrip("/"),
             llm_model=env.get("LLM_MODEL", "deepseek-flash"),
             llm_max_input_tokens=int(env.get("LLM_MAX_INPUT_TOKENS", "100000")),
+            llm_reasoning_effort=env.get("LLM_REASONING_EFFORT", "low"),
         )
 
     def user_agent(self) -> str:

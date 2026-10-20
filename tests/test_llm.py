@@ -38,8 +38,8 @@ def test_request_body(settings):
     body = json.loads(req.content)
     assert str(req.url) == "https://api.deepseek.com/chat/completions"
     assert req.headers["Authorization"] == "Bearer k"
-    assert body["response_format"] == {"type": "json_object"} and body["max_tokens"] == 16000
-    assert body["model"] == "deepseek-flash"
+    assert body["response_format"] == {"type": "json_object"} and body["max_tokens"] == 32000
+    assert body["model"] == "deepseek-flash" and body["reasoning_effort"] == "low" and "thinking" not in body
     assert body["messages"][0]["role"] == "system" and "Reply with only a JSON object" in body["messages"][0]["content"]
     assert body["messages"][1] == {"role": "user", "content": "question"}
 
@@ -48,6 +48,27 @@ def test_retry_invalid_then_ok(settings):
     t = Recorder([reply("{}"), reply('{"labels": "ok"}')])
     obj, _ = llm.ask("q", "", Labels, settings=settings, transport=t)
     assert obj.labels == "ok" and len(t.requests) == 2
+
+
+def cut_off() -> httpx.Response:
+    """What deepseek-flash returns when hidden reasoning uses the whole max_tokens budget."""
+    return httpx.Response(200, json={"choices": [{"message": {"content": ""}, "finish_reason": "length"}],
+                                     "usage": {"completion_tokens": 32000,
+                                               "completion_tokens_details": {"reasoning_tokens": 32000}}})
+
+
+def test_cut_off_retries_without_thinking(settings):
+    t = Recorder([cut_off(), reply('{"labels": "ok"}')])
+    obj, _ = llm.ask("q", "", Labels, settings=settings, transport=t)
+    assert obj.labels == "ok"
+    retry = json.loads(t.requests[1].content)
+    assert retry["thinking"] == {"type": "disabled"} and "reasoning_effort" not in retry
+
+
+def test_cut_off_twice_names_the_cause(settings):
+    t = Recorder([cut_off(), cut_off()])
+    with pytest.raises(LlmError, match="finish_reason=length"):
+        llm.ask("q", "", Labels, settings=settings, transport=t)
 
 
 def test_two_failures_raise(settings):

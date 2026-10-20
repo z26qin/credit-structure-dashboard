@@ -14,16 +14,23 @@ from .models import Fact, Financials, MaturityBucket, Quarter
 TOLERANCE_DAYS = 7  # 52/53-week fiscal years end on slightly different dates each year
 MATURITY = "LongTermDebtMaturitiesRepaymentsOfPrincipal"
 
-FIELDS: dict[str, list[str]] = {
-    "revenue": ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues"],
-    "operating_income": ["OperatingIncomeLoss"],
-    "da": ["DepreciationDepletionAndAmortization", "DepreciationAndAmortization",
-           "DepreciationAmortizationAndAccretionNet"],
-    "interest_expense": ["InterestExpenseDebt", "InterestExpense", "InterestExpenseNonoperating"],
-    "interest_paid": ["InterestPaidNet", "InterestPaid"],
-    "cfo": ["NetCashProvidedByUsedInOperatingActivities"],
-    "capex": ["PaymentsToAcquirePropertyPlantAndEquipment"],
+# Per field, the first source that has a value wins. A source is a tuple of tags summed together; a leading
+# "-" negates a tag (a net non-operating interest line is negative when it is an expense).
+FIELDS: dict[str, list[tuple[str, ...]]] = {
+    "revenue": [("RevenueFromContractWithCustomerExcludingAssessedTax",), ("Revenues",)],
+    "operating_income": [("OperatingIncomeLoss",)],
+    "da": [("DepreciationDepletionAndAmortization",), ("DepreciationAndAmortization",),
+           ("DepreciationAmortizationAndAccretionNet",), ("Depreciation", "AmortizationOfIntangibleAssets")],
+    "interest_expense": [("InterestExpenseDebt",), ("InterestExpense",), ("InterestExpenseNonoperating",),
+                         ("-InterestIncomeExpenseNonoperatingNet",)],
+    "interest_paid": [("InterestPaidNet",), ("InterestPaid",)],
+    "cfo": [("NetCashProvidedByUsedInOperatingActivities",)],
+    "capex": [("PaymentsToAcquirePropertyPlantAndEquipment",)],
 }
+TOTAL_DEBT_TAGS = ("DebtInstrumentCarryingAmount", "DebtLongtermAndShorttermCombinedAmount")
+NONCURRENT_DEBT_TAGS = ("LongTermDebtNoncurrent", "LongTermNotesAndLoans", "LongTermDebtAndCapitalLeaseObligations")
+CURRENT_DEBT_TAGS = ("LongTermDebtCurrent", "NotesPayableCurrent", "DebtCurrent",
+                     "LongTermDebtAndCapitalLeaseObligationsCurrent")
 
 
 # --- fiscal calendar -------------------------------------------------------------------------
@@ -135,9 +142,11 @@ def _quarter_value(durs, end: date, fiscal_year_end: str) -> float | None:
 # --- public ----------------------------------------------------------------------------------
 
 def build_financials(companyfacts: dict, instance_xml: str, period_end: date, fiscal_year_end: str,
-                     accession: str) -> Financials:
+                     accession: str, annual_end: date | None = None) -> Financials:
+    """`annual_end`: the latest 10-K's period end, whose maturity schedule is used when the 10-Q has none."""
     total_debt = _total_debt(companyfacts, period_end)
     quarters = _quarters(companyfacts, period_end, fiscal_year_end)
+    maturities, as_of = _maturities(companyfacts, period_end, fiscal_year_end, total_debt.value, annual_end)
     return Financials(
         period_end=period_end,
         fiscal_year_end=fiscal_year_end,
@@ -148,23 +157,32 @@ def build_financials(companyfacts: dict, instance_xml: str, period_end: date, fi
         fin_lease=_first_instant(companyfacts, ["FinanceLeaseLiability"], period_end),
         rpo=_first_instant(companyfacts, ["RevenueRemainingPerformanceObligation"], period_end),
         shares_outstanding=_shares(instance_xml, accession),
-        maturities=_maturities(companyfacts, period_end, fiscal_year_end, total_debt.value),
+        maturities=maturities,
+        maturities_as_of=as_of,
         quarters=quarters,
         ttm=_ttm(quarters, period_end),
     )
 
 
+def _first(facts: dict, tags: tuple[str, ...], period_end: date) -> Fact | None:
+    return next((f for t in tags if (f := _instant(facts, t, period_end)) is not None), None)
+
+
 def _total_debt(facts: dict, period_end: date) -> Fact:
-    if (f := _instant(facts, "DebtInstrumentCarryingAmount", period_end)) is not None:
+    if (f := _first(facts, TOTAL_DEBT_TAGS, period_end)) is not None:
         return f
     stb = _instant(facts, "ShortTermBorrowings", period_end)
-    # LongTermDebt already includes its current portion; adding LongTermDebtCurrent would double count.
+    # LongTermDebt already includes its current portion; adding a current tag would double count.
     lt = _instant(facts, "LongTermDebt", period_end)
-    parts: list[Fact] = [lt] if lt else [p for p in (_instant(facts, "LongTermDebtNoncurrent", period_end),
-                                                     _instant(facts, "LongTermDebtCurrent", period_end)) if p]
+    if lt:
+        parts = [lt]
+    else:
+        parts = [p for p in (_first(facts, NONCURRENT_DEBT_TAGS, period_end),
+                             _first(facts, CURRENT_DEBT_TAGS, period_end)) if p]
     if not parts:
         return Fact(value=None, note=f"no total debt reported at {period_end}")
-    parts += [stb] if stb else []
+    if stb and not any(p.tag == "DebtCurrent" for p in parts):  # DebtCurrent already includes it
+        parts.append(stb)
     return Fact(value=sum(p.value for p in parts), tag="+".join(p.tag for p in parts),
                 accession=parts[0].accession, period=period_end.isoformat())
 
@@ -177,24 +195,42 @@ def _shares(instance_xml: str, accession: str) -> Fact:
                 accession=accession, note="cover page, all share classes")
 
 
-def _maturities(facts: dict, period_end: date, fiscal_year_end: str, total: float | None) -> list[MaturityBucket]:
-    fy = fiscal_year_of(period_end, fiscal_year_end)
+def _maturities(facts: dict, period_end: date, fiscal_year_end: str, total: float | None,
+                annual_end: date | None) -> tuple[list[MaturityBucket], date | None]:
+    for as_of in (period_end, annual_end):
+        if as_of is not None:
+            buckets = _schedule(facts, as_of, period_end, fiscal_year_end, total)
+            if buckets:
+                return buckets, as_of
+    return [], None
+
+
+def _schedule(facts: dict, as_of: date, period_end: date, fiscal_year_end: str,
+              total: float | None) -> list[MaturityBucket]:
+    """The schedule tagged at `as_of`, labeled from `period_end`: years already past are dropped and the
+    current fiscal year becomes the remainder bucket."""
     cal = fiscal_year_end == "1231"
-    months_left = _months(period_end, fiscal_year_end_date(fy, fiscal_year_end))
-    rem = _instant(facts, MATURITY + "RemainderOfFiscalYear", period_end)
+    ref_fy = fiscal_year_of(as_of, fiscal_year_end)
+    cur_fy = fiscal_year_of(period_end, fiscal_year_end)
+    months_left = _months(period_end, fiscal_year_end_date(cur_fy, fiscal_year_end))
+    raw: list[tuple[int, Fact]] = []
+    rem = _instant(facts, MATURITY + "RemainderOfFiscalYear", as_of)
+    if rem is not None and 0 < _months(as_of, fiscal_year_end_date(ref_fy, fiscal_year_end)) < 12:
+        raw.append((ref_fy, rem))
     years = ["InNextTwelveMonths", "InYearTwo", "InYearThree", "InYearFour", "InYearFive"]
-    buckets: list[MaturityBucket] = []
-    if rem is not None and 0 < months_left < 12:
-        buckets.append(MaturityBucket(label=bucket_label(fy, months_left, cal), fiscal_year=fy, months=months_left,
-                                      principal=rem.value, tag=rem.tag))
     for i, suffix in enumerate(years, start=1):
-        f = _instant(facts, MATURITY + suffix, period_end)
-        if f is not None:
-            buckets.append(MaturityBucket(label=bucket_label(fy + i, 12, cal), fiscal_year=fy + i, months=12,
-                                          principal=f.value, tag=f.tag))
+        if (f := _instant(facts, MATURITY + suffix, as_of)) is not None:
+            raw.append((ref_fy + i, f))
+    buckets: list[MaturityBucket] = []
+    for fy, f in raw:
+        if fy < cur_fy:
+            continue
+        months = months_left if fy == cur_fy and 0 < months_left < 12 else 12
+        buckets.append(MaturityBucket(label=bucket_label(fy, months, cal), fiscal_year=fy, months=months,
+                                      principal=f.value, tag=f.tag))
     if not buckets:
         return []
-    after = _instant(facts, MATURITY + "AfterYearFive", period_end)
+    after = _instant(facts, MATURITY + "AfterYearFive", as_of)
     if after is not None:
         buckets.append(MaturityBucket(label="Thereafter", fiscal_year=None, months=0, principal=after.value,
                                       tag=after.tag))
@@ -205,14 +241,26 @@ def _maturities(facts: dict, period_end: date, fiscal_year_end: str, total: floa
     return buckets
 
 
+def _source_value(durs: list[tuple[int, dict]], end: date, fiscal_year_end: str) -> float | None:
+    """Sum of one source's tags for the quarter ending `end`; None unless every tag has a value."""
+    total = 0.0
+    for sign, d in durs:
+        v = _quarter_value(d, end, fiscal_year_end)
+        if v is None:
+            return None
+        total += sign * v
+    return max(total, 0.0) if any(sign < 0 for sign, _ in durs) else total
+
+
 def _quarters(facts: dict, period_end: date, fiscal_year_end: str) -> list[Quarter]:
-    durs = {field: [_durations(facts, t) for t in tags] for field, tags in FIELDS.items()}
+    durs = {field: [[(-1 if t.startswith("-") else 1, _durations(facts, t.lstrip("-"))) for t in source]
+                    for source in sources] for field, sources in FIELDS.items()}
     out: list[Quarter] = []
     for i in range(7, -1, -1):
         end = _month_end_shift(period_end, -3 * i) if i else period_end
         values = {}
-        for field, per_tag in durs.items():
-            values[field] = next((v for d in per_tag if (v := _quarter_value(d, end, fiscal_year_end)) is not None),
+        for field, sources in durs.items():
+            values[field] = next((v for s in sources if (v := _source_value(s, end, fiscal_year_end)) is not None),
                                  None)
         if values["revenue"] is None and values["operating_income"] is None:
             continue

@@ -80,6 +80,7 @@ class Financials(BaseModel):
     rpo: Fact
     shares_outstanding: Fact
     maturities: list[MaturityBucket]
+    maturities_as_of: date | None = None  # period end, or the 10-K's when the 10-Q has no schedule
     quarters: list[Quarter]
     ttm: Quarter
 
