@@ -31,11 +31,14 @@ def load_overrides(ticker: str, overrides_dir: Path) -> dict:
         raise ConfigError(f"{path}: {e}") from e
 
 
-def fetch_market(ticker: str, shares: Fact, overrides_dir: Path,
-                 transport: httpx.BaseTransport | None = None) -> Market:
+def fetch_market(ticker: str, shares: Fact, overrides_dir: Path, transport: httpx.BaseTransport | None = None,
+                 cache_dir: Path | None = None) -> Market:
     o = load_overrides(ticker, overrides_dir)
     with httpx.Client(transport=transport, timeout=20, follow_redirects=True) as client:
-        sofr = _sofr(client)
+        if o.get("sofr") is not None:
+            sofr = Fact(value=float(o["sofr"]), tag="override", note=f"overrides/{ticker}.yaml")
+        else:
+            sofr = _sofr(client, cache_dir)
         if o.get("price") is not None:
             price = Fact(value=float(o["price"]), tag="override", note=f"overrides/{ticker}.yaml")
         else:
@@ -51,14 +54,24 @@ def fetch_market(ticker: str, shares: Fact, overrides_dir: Path,
                   **({"ebitda_label": str(o["ebitda_label"])} if o.get("ebitda_label") else {}))
 
 
-def _sofr(client: httpx.Client) -> Fact:
+def _sofr(client: httpx.Client, cache_dir: Path | None) -> Fact:
+    """Today's SOFR; when the NY Fed is unreachable, the last value fetched (floating-rate interest needs it)."""
+    cache = cache_dir / "sofr.json" if cache_dir else None
     try:
         r = client.get(SOFR_URL)
         r.raise_for_status()
         row = r.json()["refRates"][0]
-        return Fact(value=float(row["percentRate"]), tag="NY Fed SOFR", period=row["effectiveDate"])
+        fact = Fact(value=float(row["percentRate"]), tag="NY Fed SOFR", period=row["effectiveDate"])
+        if cache:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_text(fact.model_dump_json())
+        return fact
     except Exception as e:
-        return Fact(value=None, note=f"NY Fed SOFR: {type(e).__name__}: {e}"[:300])
+        error = f"NY Fed SOFR: {type(e).__name__}: {e}"[:300]
+        if cache and cache.exists():
+            cached = Fact.model_validate_json(cache.read_text())
+            return cached.model_copy(update={"note": f"cached from {cached.period}; {error}"})
+        return Fact(value=None, note=error)
 
 
 def _price(client: httpx.Client, ticker: str) -> Fact:

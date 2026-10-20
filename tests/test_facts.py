@@ -129,3 +129,26 @@ def test_long_term_debt_fallback_does_not_double_count_current():
     }}}
     fin = build_financials(facts, "<xbrl/>", date(2026, 6, 30), "1231", "x")
     assert fin.total_debt.value == 950.0
+
+
+def test_fiscal_year_of_early_january_52_53_week():
+    from creditdash.facts import fiscal_year_of, quarter_label
+    assert fiscal_year_of(date(2027, 1, 2), "1231") == 2026 and quarter_label(date(2027, 1, 2), "1231") == "Q4 26"
+    assert fiscal_year_of(date(2026, 12, 31), "1231") == 2026 and fiscal_year_of(date(2027, 1, 31), "1231") == 2027
+
+
+def test_capex_fallback_tag():
+    facts = {"facts": {"us-gaap": {
+        "OperatingIncomeLoss": {"units": {"USD": [usd("2026-04-01", "2026-06-30", 100e6)]}},
+        "PaymentsToAcquireProductiveAssets": {"units": {"USD": [usd("2026-04-01", "2026-06-30", 70e6)]}},
+    }}}
+    assert build_financials(facts, "<xbrl/>", date(2026, 6, 30), "1231", "x").quarters[-1].capex == 70.0
+
+
+def test_carrying_amount_for_one_note_is_not_total_debt():
+    facts = {"facts": {"us-gaap": {
+        "DebtInstrumentCarryingAmount": {"units": {"USD": [usd(None, "2026-06-30", 500e6)]}},
+        "LongTermDebt": {"units": {"USD": [usd(None, "2026-06-30", 5000e6)]}},
+    }}}
+    total = build_financials(facts, "<xbrl/>", date(2026, 6, 30), "1231", "x").total_debt
+    assert total.value == 5000.0 and total.tag == "LongTermDebt" and "DebtInstrumentCarryingAmount" in total.note

@@ -26,6 +26,8 @@ from .reconcile import maturity_date
 BEYOND = "__beyond__"  # principal due after the last modeled period
 UNALLOCATED_SOURCE = "reconcile"  # the reported debt no extracted instrument accounts for
 GAP_THEREAFTER_YEARS = 5  # its "Thereafter" share is spread over the 5 years after the last dated bucket
+NO_RATE = "(no rate: interest not modeled)"  # principal is scheduled; the page warns that interest is missing
+MATURED = "(matured before period end)"  # left out of the stack and the schedule
 
 
 @dataclass
@@ -88,22 +90,28 @@ def run_model(instruments: list[Instrument], financials: Financials, market: Mar
     # No maturity (the unallocated gap, category totals, an undated revolver): these share whatever the
     # reported schedule leaves after the dated instruments, in proportion to their balances.
     undated: list[Instrument] = []
+    matured: list[Instrument] = []  # a stale balance (e.g. read from an older 10-K): not owed any more
     for i in instruments:
         mat = maturity_date(i.maturity)
         balance = (i.principal or 0) + (i.post_period_change or 0)
         if (i.principal is None and i.post_period_change is None) or balance <= 0:
             excluded.append(i.name)
             continue
+        if mat is not None and mat < financials.period_end:
+            matured.append(i)
+            excluded.append(f"{i.name} {MATURED}")
+            continue
         if i.source == UNALLOCATED_SOURCE or mat is None:
             undated.append(i)
             continue
         rate = _rate(i, market.sofr_pct.value)
         if rate is None:
-            excluded.append(f"{i.name} (no rate)")
+            excluded.append(f"{i.name} {NO_RATE}")
         loans.append(_Loan(inst=i, principal=i.principal or 0, post=i.post_period_change or 0,
                            maturity=max(mat, financials.period_end + timedelta(days=1)), rate=rate or 0.0,
                            flexible=i.amortization != "bullet"))
 
+    financials = _drop_matured(financials, matured)
     balance_of = {id(i): (i.principal or 0) + (i.post_period_change or 0) for i in undated}
     undated_total = sum(balance_of.values())
     dated = [b.fiscal_year for b in financials.maturities if b.fiscal_year is not None]
@@ -124,7 +132,7 @@ def run_model(instruments: list[Instrument], financials: Financials, market: Mar
                 rate = _rate(i, market.sofr_pct.value) if i.source != UNALLOCATED_SOURCE else None
                 rate = rate if rate is not None else fallback_rate
                 if rate is None:
-                    excluded.append(f"{i.name} (no rate)")
+                    excluded.append(f"{i.name} {NO_RATE}")
                 share = balance_of[id(i)] / undated_total
                 loan = _Loan(inst=i, principal=balance_of[id(i)], post=0.0, maturity=spread_until, rate=rate or 0.0,
                              flexible=True)
@@ -139,9 +147,23 @@ def run_model(instruments: list[Instrument], financials: Financials, market: Mar
         due[r.period] += r.principal + r.interest
     coverage = [CoverageRow(scenario=s.scenario, period=s.period,
                             dscr=s.ebitda / due[s.period] if due[s.period] else None) for s in scenarios]
+    outstanding = [i for i in instruments if all(i is not m for m in matured)]
     return ModelOutput(periods=periods, debt_service=service, scenarios=scenarios, coverage=coverage,
-                       raise_rows=_raise(financials, market, periods, service), stack=_stack(instruments, market),
+                       raise_rows=_raise(financials, market, periods, service), stack=_stack(outstanding, market),
                        waterfall=_waterfall(service, scenarios), excluded=excluded, fit_error=fit_error)
+
+
+def _drop_matured(financials: Financials, matured: list[Instrument]) -> Financials:
+    """A schedule taken from an older 10-K still counts notes that have matured since; take them out of the
+    current fiscal year's bucket."""
+    as_of = financials.maturities_as_of
+    if not matured or as_of is None or as_of >= financials.period_end:
+        return financials
+    paid = sum(i.principal or 0 for i in matured if as_of < maturity_date(i.maturity) <= financials.period_end)
+    fy = fiscal_year_of(financials.period_end, financials.fiscal_year_end)
+    buckets = [b.model_copy(update={"principal": max(b.principal - paid, 0.0)}) if b.fiscal_year == fy else b
+               for b in financials.maturities]
+    return financials.model_copy(update={"maturities": buckets})
 
 
 def _period_of(periods: list[Period]):
@@ -332,9 +354,10 @@ def _scenarios(financials: Financials, market: Market, periods, settings: ModelS
     last = financials.quarters[-1].ebitda if financials.quarters else None
     series["run-rate"] = None if last is None else {p.label: last * 4 * p.months / 12 for p in periods}
     base = consensus or series["ttm"]
-    if base:  # the haircut starts after the first modeled period
-        series["stress"] = {p.label: base[p.label] * (1 if n == 0 else 1 - settings.stress_haircut)
-                            for n, p in enumerate(periods)}
+    if base:  # spec §3.7: the haircut applies from FY+1, the first fiscal year after the period end's
+        fy = fiscal_year_of(financials.period_end, financials.fiscal_year_end)
+        series["stress"] = {p.label: base[p.label] * (1 if p.fiscal_year <= fy else 1 - settings.stress_haircut)
+                            for p in periods}
     for name, values in series.items():
         if values:
             rows += [ScenarioRow(scenario=name, period=p.label, ebitda=values[p.label]) for p in periods]
@@ -344,7 +367,7 @@ def _scenarios(financials: Financials, market: Market, periods, settings: ModelS
 def _raise(financials: Financials, market: Market, periods, service: list[ServiceRow]) -> list[RaiseRow]:
     capex = _annual(financials, market, "capex", periods)
     cfo = _annual(financials, market, "cfo", periods)
-    if capex is None and cfo is None:
+    if capex is None:  # treating unreported capex as zero would understate the cash to raise
         return []
     principal = defaultdict(float)
     for r in service:

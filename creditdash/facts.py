@@ -25,8 +25,10 @@ FIELDS: dict[str, list[tuple[str, ...]]] = {
                          ("-InterestIncomeExpenseNonoperatingNet",)],
     "interest_paid": [("InterestPaidNet",), ("InterestPaid",)],
     "cfo": [("NetCashProvidedByUsedInOperatingActivities",)],
-    "capex": [("PaymentsToAcquirePropertyPlantAndEquipment",)],
+    "capex": [("PaymentsToAcquirePropertyPlantAndEquipment",), ("PaymentsToAcquireProductiveAssets",),
+              ("PaymentsToAcquireOtherPropertyPlantAndEquipment",), ("PaymentsForCapitalImprovements",)],
 }
+SINGLE_NOTE_RATIO = 0.9  # a "total" tag under 90% of balance-sheet debt is most likely one instrument
 TOTAL_DEBT_TAGS = ("DebtInstrumentCarryingAmount", "DebtLongtermAndShorttermCombinedAmount")
 NONCURRENT_DEBT_TAGS = ("LongTermDebtNoncurrent", "LongTermNotesAndLoans", "LongTermDebtAndCapitalLeaseObligations")
 CURRENT_DEBT_TAGS = ("LongTermDebtCurrent", "NotesPayableCurrent", "DebtCurrent",
@@ -41,8 +43,12 @@ def _fye_date(fiscal_year_end: str, year: int) -> date:
 
 
 def fiscal_year_of(d: date, fiscal_year_end: str) -> int:
-    """Fiscal years are named by the calendar year they end in."""
-    return d.year if d <= _fye_date(fiscal_year_end, d.year) + timedelta(days=TOLERANCE_DAYS) else d.year + 1
+    """Fiscal years are named by the calendar year they end in. A 52/53-week year can end a few days after
+    its nominal date (a "1231" year ending 2027-01-02 is fiscal 2026), hence the tolerance on both sides."""
+    tol = timedelta(days=TOLERANCE_DAYS)
+    if d <= _fye_date(fiscal_year_end, d.year - 1) + tol:
+        return d.year - 1
+    return d.year if d <= _fye_date(fiscal_year_end, d.year) + tol else d.year + 1
 
 
 def fiscal_year_start(fy: int, fiscal_year_end: str) -> date:
@@ -169,8 +175,17 @@ def _first(facts: dict, tags: tuple[str, ...], period_end: date) -> Fact | None:
 
 
 def _total_debt(facts: dict, period_end: date) -> Fact:
-    if (f := _first(facts, TOTAL_DEBT_TAGS, period_end)) is not None:
-        return f
+    total = _first(facts, TOTAL_DEBT_TAGS, period_end)
+    structural = _balance_sheet_debt(facts, period_end)
+    if total is None:
+        return structural
+    if structural.value is not None and total.value < SINGLE_NOTE_RATIO * structural.value:
+        return structural.model_copy(update={"note": f"{total.tag} ({total.value:,.0f}) is under "
+                                             f"{SINGLE_NOTE_RATIO:.0%} of balance-sheet debt; it likely tags one note"})
+    return total
+
+
+def _balance_sheet_debt(facts: dict, period_end: date) -> Fact:
     stb = _instant(facts, "ShortTermBorrowings", period_end)
     # LongTermDebt already includes its current portion; adding a current tag would double count.
     lt = _instant(facts, "LongTermDebt", period_end)

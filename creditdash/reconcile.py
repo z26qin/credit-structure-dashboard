@@ -57,6 +57,11 @@ def reconcile(extraction: Extraction | None, financials: Financials,
         if not i.verified:
             unverified.append(i.name)
 
+    for i in instruments:
+        d = maturity_date(i.maturity)
+        if d is not None and d < financials.period_end and (i.principal or 0) > 0:
+            notes.append(f"{i.name} matured {i.maturity}, before the period end {financials.period_end}: its balance "
+                         "is likely from an older filing, so it is left out of the stack and the schedule")
     extracted = sum(i.principal or 0 for i in instruments)
     maturity_diff = _maturity_diff(instruments, financials)
     if reported is None:

@@ -68,3 +68,9 @@ def test_write_outputs(tmp_path):
     assert path == tmp_path / "CRWV" / "2026-06-30" / "index.html"
     assert path.read_text().startswith("<!doctype html>")
     assert Dashboard.model_validate_json((path.parent / "dashboard.json").read_text()).company.ticker == "CRWV"
+
+
+def test_unmodeled_interest_banner():
+    d = sample_dashboard()
+    d = d.model_copy(update={"model": d.model.model_copy(update={"excluded": ["B (no rate: interest not modeled)"]})})
+    assert "Interest not modeled for: B" in render(d)

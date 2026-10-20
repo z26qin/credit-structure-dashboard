@@ -6,6 +6,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from markupsafe import Markup
 
+from .model import MATURED, NO_RATE
 from .models import Dashboard
 
 HERE = Path(__file__).parent
@@ -22,8 +23,11 @@ def _json_for_script(dashboard: Dashboard) -> Markup:
 
 def render(dashboard: Dashboard) -> str:
     static = HERE / "static"
+    excluded = dashboard.model.excluded
     return _env.get_template("dashboard.html.j2").render(
         d=dashboard,
+        no_rate=[e.removesuffix(" " + NO_RATE) for e in excluded if e.endswith(NO_RATE)],
+        matured=[e.removesuffix(" " + MATURED) for e in excluded if e.endswith(MATURED)],
         data_json=_json_for_script(dashboard),
         css=Markup((static / "dashboard.css").read_text()),
         d3=Markup((static / "d3.v7.min.js").read_text()),

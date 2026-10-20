@@ -85,7 +85,7 @@ def test_null_principal_excluded():
 def test_no_rate_flagged_but_scheduled():
     out = run_model(TOY + [inst("Mystery", 10, maturity="2027-01", seniority="other", amortization="bullet",
                                 rate_type="unknown")], FIN, MKT, SETTINGS)
-    assert "Mystery (no rate)" in out.excluded
+    assert "Mystery (no rate: interest not modeled)" in out.excluded
     assert principal_by(out)[("Mystery", "2027")] == approx(10)
 
 
@@ -149,3 +149,40 @@ def test_waterfall_shortfall():  # TTM EBITDA 150: B due 115.25 is paid, A due 3
     assert w[SeniorityClass.asset_level_secured].shortfall == 0
     assert w[SeniorityClass.senior_unsecured].shortfall == approx(307.5 - (150 - 115.25), abs=0.01)
     assert w[SeniorityClass.convertible].paid == 0
+
+
+# --- final review fixes ------------------------------------------------------------------------
+
+def test_matured_before_period_end_is_not_scheduled():
+    # ORCL: a 10-K-sourced list kept a note that matured in July for an August period end, and the 10-K's
+    # current-year bucket still contained it.
+    from datetime import date
+    fin = FIN.model_copy(update={"maturities_as_of": date(2025, 12, 31), "maturities": [
+        b.model_copy(update={"principal": 400}) if b.label == "2H26" else b for b in FIN.maturities]})
+    old = inst("Old notes", 300, maturity="2026-03", seniority="senior_unsecured", amortization="bullet", fixed=2.65)
+    out = run_model(TOY + [old], fin, MKT, SETTINGS)
+    assert "Old notes (matured before period end)" in out.excluded
+    assert not any(r.instrument == "Old notes" for r in out.debt_service)
+    assert principal_by(out)[("B", "2H26")] == approx(100, abs=0.01)  # 10-K bucket less the matured note
+    assert next(s for s in out.stack if s.label == "Senior unsecured").amount == approx(300)
+
+
+def test_stress_haircut_starts_the_year_after_a_10k():
+    from datetime import date
+    from creditdash.models import MaturityBucket
+    fin = FIN.model_copy(update={"period_end": date(2025, 12, 31), "maturities": [
+        MaturityBucket(label="2026", fiscal_year=2026, months=12, principal=400, tag=None),
+        MaturityBucket(label="2027", fiscal_year=2027, months=12, principal=300, tag=None),
+        MaturityBucket(label="Thereafter", fiscal_year=None, months=0, principal=300, tag=None)]})
+    s = {(r.scenario, r.period): r.ebitda for r in run_model(TOY, fin, MKT, SETTINGS).scenarios}
+    assert s[("ttm", "2026")] == approx(500) and s[("stress", "2026")] == approx(350)
+
+
+def test_raise_needs_capex():
+    fin = FIN.model_copy(update={"ttm": FIN.ttm.model_copy(update={"capex": None})})
+    assert run_model(TOY, fin, MKT, SETTINGS).raise_rows == []
+
+
+def test_floating_without_sofr_is_flagged_as_unmodeled_interest():
+    out = run_model(TOY, FIN, market(sofr=None), SETTINGS)
+    assert "B (no rate: interest not modeled)" in out.excluded

@@ -1,11 +1,32 @@
 """Data passed between pipeline stages. Money is $ millions (float) everywhere."""
 from __future__ import annotations
 
+import calendar
+import re
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
+
+_MONTHS = {name.lower(): i for i, name in enumerate(calendar.month_abbr) if name}
+
+
+def normalize_maturity(value: object) -> str | None:
+    """YYYY-MM from the forms a filing or model may use: 2030-12, 2030-12-31, 2030, Dec 2030, September 1, 2031.
+    Anything else is None (undated), which the dashboard lists as such."""
+    if value is None:
+        return None
+    s = str(value).strip()
+    if m := re.fullmatch(r"(\d{4})-(\d{1,2})(?:-\d{1,2})?", s):
+        y, mo = int(m.group(1)), int(m.group(2))
+        return f"{y}-{mo:02d}" if 1 <= mo <= 12 else None
+    if re.fullmatch(r"\d{4}", s):
+        return f"{s}-12"
+    if m := re.fullmatch(r"([A-Za-z]+)\.?\s+(?:\d{1,2},\s*)?(\d{4})", s):
+        mo = _MONTHS.get(m.group(1)[:3].lower())
+        return f"{m.group(2)}-{mo:02d}" if mo else None
+    return None
 
 
 # --- filings ---------------------------------------------------------------------------------
@@ -151,6 +172,11 @@ class Instrument(BaseModel):
     source: str = Field(description="accession number the fields came from")
     quotes: list[str] = Field(default=[], description="1-3 verbatim snippets, each at most 300 characters")
     verified: bool = True  # set by reconcile; not part of the LLM schema
+
+    @field_validator("maturity", mode="before")
+    @classmethod
+    def _maturity(cls, v: object) -> str | None:
+        return normalize_maturity(v)
 
 
 class Extraction(BaseModel):

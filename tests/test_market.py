@@ -74,3 +74,15 @@ def test_bad_overrides_file(tmp_path):
     (tmp_path / "CRWV.yaml").write_text("price: [not, a, number\n")
     with pytest.raises(Exception, match="CRWV.yaml"):
         load_overrides("CRWV", tmp_path)
+
+
+def test_sofr_cached_and_reused_when_down(tmp_path):
+    fetch_market("CRWV", SHARES, tmp_path, transport=Market(), cache_dir=tmp_path / "cache")
+    m = fetch_market("CRWV", SHARES, tmp_path, transport=Market(sofr_status=500), cache_dir=tmp_path / "cache")
+    assert m.sofr_pct.value == 3.87 and "cached" in m.sofr_pct.note
+
+
+def test_sofr_override(tmp_path):
+    (tmp_path / "CRWV.yaml").write_text("sofr: 4.1\n")
+    m = fetch_market("CRWV", SHARES, tmp_path, transport=Market(sofr_status=500))
+    assert m.sofr_pct.value == 4.1 and m.sofr_pct.tag == "override"

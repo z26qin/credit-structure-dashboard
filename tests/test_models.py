@@ -55,3 +55,11 @@ def test_dashboard_roundtrip():
     back = Dashboard.model_validate_json(d.model_dump_json())
     assert back == d
     assert back.instruments[0].verified is False
+
+
+def test_maturity_normalized():
+    from creditdash.models import Instrument
+    cases = [("2030-12-31", "2030-12"), ("2030", "2030-12"), ("Dec 2030", "2030-12"), ("December 2030", "2030-12"),
+             ("2030-06", "2030-06"), ("Various", None), (None, None)]
+    for raw, want in cases:
+        assert Instrument(name="x", kind="other", seniority_class="other", source="s", maturity=raw).maturity == want, raw

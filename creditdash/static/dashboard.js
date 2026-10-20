@@ -259,13 +259,17 @@
       "; post-period draws are scheduled on top. Interest is charged monthly on the opening balance; floating rates use SOFR " +
       pct(sofr, 2) + " held flat."));
     ml.append(el("li", {}, "Scenarios: consensus when given in overrides (current year less reported quarters); TTM held flat; run-rate = latest quarter × 4; stress = consensus or TTM less " +
-      Math.round((D.settings.stress_haircut || 0) * 100) + "% after the first period."));
+      Math.round((D.settings.stress_haircut || 0) * 100) + "% from the fiscal year after the period end."));
     const undated = D.instruments.filter((i) => balance(i) > 0 && (i.source === "reconcile" || !i.maturity));
     if (undated.length) ml.append(el("li", {}, "No maturity date: " + undated.map((i) => i.name + " " + money(balance(i))).join(", ") +
       ". These share whatever the reported maturity schedule leaves after the dated instruments, in proportion to balance, " +
       "with the Thereafter share spread over the five years after the last dated year. Unallocated is reported debt no " +
       "instrument accounts for; it uses the known instruments' average rate (or TTM interest ÷ debt)."));
-    if (D.model.excluded.length) ml.append(el("li", {}, "Not in the schedule (no maturity, balance or rate): " + D.model.excluded.join(", ") + "."));
+    const noRate = D.model.excluded.filter((e) => e.includes("(no rate"));
+    const unscheduled = D.model.excluded.filter((e) => !e.includes("(no rate"));
+    if (unscheduled.length) ml.append(el("li", {}, "Not in the schedule: " + unscheduled.join(", ") + "."));
+    if (noRate.length) ml.append(el("li", {}, "Scheduled without interest (no coupon, spread or SOFR): " +
+      noRate.map((e) => e.split(" (no rate")[0]).join(", ") + "."));
     body.append(ml);
   }
 
@@ -567,7 +571,7 @@
       { color: css("--bad-fill"), label: "To raise" },
     ]);
     const rows = D.model.raise_rows;
-    if (!rows.length) return unavailable(node, "no capex or operating cash flow reported");
+    if (!rows.length) return unavailable(node, "no capex reported, so cash to raise cannot be estimated");
     const hasConsensus = D.market.consensus.some((c) => isNum(c.capex) || isNum(c.cfo));
     const total = d3.sum(rows, (r) => r.to_raise);
     document.getElementById("raise-note").textContent = "Capex plus scheduled principal, less cash from operations (" +

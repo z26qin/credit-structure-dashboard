@@ -99,3 +99,8 @@ def test_maturity_diff():
     by = {d["label"]: d for d in rec.maturity_diff}
     assert (by["2029"]["reported"], by["2029"]["bullets"]) == (400, 400)
     assert by["Thereafter"]["bullets"] == 600
+
+
+def test_matured_before_period_end_noted():
+    rec, _ = reconcile(ext(inst("Term Loan", 400), inst("Old", 600, maturity="2026-05")), fin(), SOURCES)
+    assert any("Old" in n and "matured" in n for n in rec.notes)

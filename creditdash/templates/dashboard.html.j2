@@ -16,6 +16,8 @@
       <span class="cw-note" id="recon-detail"></span>
     </div>
     {% if d.extraction_skipped %}<p class="cw-banner">instrument detail unavailable: {{ d.extraction_skipped }}</p>{% endif %}
+    {% if no_rate %}<p class="cw-banner">Interest not modeled for: {{ no_rate | join(", ") }} (no coupon, spread or SOFR available); coverage is overstated.</p>{% endif %}
+    {% if matured %}<p class="cw-banner">Matured before the period end and left out: {{ matured | join(", ") }} (the instrument list is from an older filing).</p>{% endif %}
     <div class="cw-controls">
       <span class="cw-note">EBITDA scenario</span>
       <div class="cw-seg" role="group" aria-label="EBITDA scenario" id="scenario-ctl"></div>

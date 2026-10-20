@@ -74,7 +74,8 @@ def build(ticker: str, *, settings: Settings, refresh: bool = False, no_llm: boo
     reconciliation, instruments = reconcile(extraction, financials, sources)
 
     progress("market")
-    market = fetch_market(company.ticker, financials.shares_outstanding, overrides_dir, transport=market_transport)
+    market = fetch_market(company.ticker, financials.shares_outstanding, overrides_dir, transport=market_transport,
+                          cache_dir=settings.home / "cache")
 
     progress("model")
     model_settings = model_settings or load_model_settings()
