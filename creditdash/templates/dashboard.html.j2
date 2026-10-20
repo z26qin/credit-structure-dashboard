@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ d.company.ticker }} credit structure</title>
+<style>{{ css }}</style>
+</head>
+<body>
+<main class="cw">
+  <header class="cw-head" id="overview">
+    <p class="cw-kicker">{{ d.company.name }} · {{ d.company.ticker }} · {{ d.filing.form }} for the period ended {{ d.financials.period_end }}</p>
+    <h1 class="cw-title">{{ d.company.ticker }} debt stack, maturity wall and coverage</h1>
+    <div class="cw-badges">
+      <span class="cw-badge is-{{ d.reconciliation.status.value }}" id="recon-badge">Reconciliation: {{ d.reconciliation.status.value }}</span>
+      <span class="cw-note" id="recon-detail"></span>
+    </div>
+    {% if d.extraction_skipped %}<p class="cw-banner">instrument detail unavailable: {{ d.extraction_skipped }}</p>{% endif %}
+    <div class="cw-controls">
+      <span class="cw-note">EBITDA scenario</span>
+      <div class="cw-seg" role="group" aria-label="EBITDA scenario" id="scenario-ctl"></div>
+    </div>
+    <p class="cw-note">Debt per the {{ d.filing.form }} filed {{ d.filing.filed }} ({{ d.filing.accession }}){% if d.extraction and d.extraction.instruments | selectattr("post_period_change") | list %}, pro forma for changes after the period end{% endif %}. Money in US dollars; built {{ d.built_at.strftime("%Y-%m-%d %H:%M") }}.</p>
+  </header>
+
+  <section class="cw-kpis" id="kpis" aria-label="Headline figures"></section>
+
+  <h2 class="cw-h2">Capital structure</h2>
+  <div class="cw-grid">
+    <section class="cw-card" id="stack">
+      <h3>Capital structure, senior to junior</h3>
+      <p class="cw-note">Each class's height is its share of debt plus equity at market value. The attachment point is the share of capital junior to the class.</p>
+      <div class="cw-chart" id="stack-chart"></div>
+    </section>
+    <section class="cw-card" id="yield">
+      <h3>Yield by tranche and maturity</h3>
+      <p class="cw-note" id="yield-note">Bubble size is the balance.</p>
+      <div class="cw-chart" id="yield-chart"></div>
+      <div class="cw-legend" id="yield-legend"></div>
+    </section>
+  </div>
+  <section class="cw-card" id="paying">
+    <h3>Debt by what it pays</h3>
+    <p class="cw-note">Balance per instrument with its rate (disclosed effective rate, else all-in coupon), highest rate first.</p>
+    <div class="cw-chart" id="paying-chart"></div>
+  </section>
+
+  <h2 class="cw-h2">When the payouts hit the wall</h2>
+  <section class="cw-card" id="wall">
+    <h3>Payout wall vs EBITDA</h3>
+    <p class="cw-note">Interest plus scheduled principal on today's debt by fiscal year, stacked senior (bottom) to junior. The line is EBITDA under the chosen scenario; red is payout it does not cover. Click a year to open its waterfall.</p>
+    <div class="cw-chart" id="wall-chart"></div>
+    <div class="cw-legend" id="wall-legend"></div>
+  </section>
+  <div class="cw-grid">
+    <section class="cw-card" id="coverage">
+      <h3>Debt-service coverage by scenario</h3>
+      <p class="cw-note">EBITDA ÷ (interest + scheduled principal). Below 1.0x the gap has to be refinanced or raised.</p>
+      <div class="cw-chart" id="coverage-chart"></div>
+      <div class="cw-legend" id="coverage-legend"></div>
+    </section>
+    <section class="cw-card" id="raise">
+      <h3>Cash to raise each year</h3>
+      <p class="cw-note" id="raise-note">Capex plus scheduled principal, less cash from operations. The red part has to come from new debt or equity.</p>
+      <div class="cw-chart" id="raise-chart"></div>
+      <div class="cw-legend" id="raise-legend"></div>
+    </section>
+  </div>
+  <section class="cw-card" id="waterfall">
+    <h3>Cash waterfall</h3>
+    <p class="cw-note">Where a year of EBITDA goes: each class is paid interest and principal in seniority order; a shortfall shows where cash runs out.</p>
+    <div class="cw-chips" id="waterfall-years" role="group" aria-label="Year"></div>
+    <div class="cw-chart" id="waterfall-chart"></div>
+  </section>
+
+  <section class="cw-card" id="instruments">
+    <h3>Every instrument, senior to junior</h3>
+    <p class="cw-note">Click a column name to sort. Balance is pro forma for post-period changes. Rows marked unverified had a quote the filing text does not contain.</p>
+    <div class="cw-table-wrap"><table class="cw-table" id="instrument-table"></table></div>
+  </section>
+
+  <section class="cw-card cw-method" id="method">
+    <h3>Sources and method</h3>
+    <div id="method-body"></div>
+  </section>
+</main>
+<div class="cw-tip" id="tip"></div>
+<script id="dashboard-data" type="application/json">{{ data_json }}</script>
+<script>{{ d3 }}</script>
+<script>{{ js }}</script>
+</body>
+</html>

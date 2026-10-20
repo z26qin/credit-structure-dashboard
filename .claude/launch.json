@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "out-static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8799", "--bind", "127.0.0.1", "--directory", "out"],
+      "port": 8799
+    },
+    {
+      "name": "creditdash-web",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "creditdash", "serve", "--port", "8765"],
+      "port": 8765
+    }
+  ]
+}
