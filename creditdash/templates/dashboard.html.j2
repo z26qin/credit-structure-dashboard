@@ -45,19 +45,20 @@
     <h3>Debt by what it pays</h3>
     <p class="cw-note">Balance per instrument with its rate (disclosed effective rate, else all-in coupon), highest rate first.</p>
     <div class="cw-chart" id="paying-chart"></div>
+    <div class="cw-legend" id="paying-legend"></div>
   </section>
 
   <h2 class="cw-h2">When the payouts hit the wall</h2>
   <section class="cw-card" id="wall">
     <h3>Payout wall vs EBITDA</h3>
-    <p class="cw-note">Interest plus scheduled principal on today's debt by fiscal year, stacked senior (bottom) to junior. The line is EBITDA under the chosen scenario; red is payout it does not cover. Click a year to open its waterfall.</p>
+    <p class="cw-note">Interest plus scheduled principal on today's debt by fiscal year, stacked senior (bottom) to junior. The line is EBITDA under the chosen scenario; a red bracket marks payout it does not cover. Click a year to open its waterfall.</p>
     <div class="cw-chart" id="wall-chart"></div>
     <div class="cw-legend" id="wall-legend"></div>
   </section>
   <div class="cw-grid">
     <section class="cw-card" id="coverage">
       <h3>Debt-service coverage by scenario</h3>
-      <p class="cw-note">EBITDA ÷ (interest + scheduled principal). Below 1.0x the gap has to be refinanced or raised.</p>
+      <p class="cw-note">EBITDA ÷ (interest + scheduled principal) under each scenario. Below 1.0x the gap has to be refinanced or raised.</p>
       <div class="cw-chart" id="coverage-chart"></div>
       <div class="cw-legend" id="coverage-legend"></div>
     </section>
@@ -73,6 +74,7 @@
     <p class="cw-note">Where a year of EBITDA goes: each class is paid interest and principal in seniority order; a shortfall shows where cash runs out.</p>
     <div class="cw-chips" id="waterfall-years" role="group" aria-label="Year"></div>
     <div class="cw-chart" id="waterfall-chart"></div>
+    <div class="cw-legend" id="waterfall-legend"></div>
   </section>
 
   <section class="cw-card" id="instruments">

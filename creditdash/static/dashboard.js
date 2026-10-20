@@ -23,7 +23,8 @@
   }
   const times = (v) => (isNum(v) ? v.toFixed(1) + "x" : "—");
   const pct = (v, d) => (isNum(v) ? v.toFixed(d == null ? 1 : d) + "%" : "—");
-  const color = (cls) => getComputedStyle(document.documentElement).getPropertyValue("--c-" + cls).trim() || "#999";
+  const color = (cls) => getComputedStyle(document.documentElement)
+    .getPropertyValue(cls === "raise" ? "--bad" : "--c-" + cls).trim() || "#999";
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
   function el(tag, attrs, text) {
@@ -274,9 +275,11 @@
   }
 
   // --- chart helpers ---------------------------------------------------------------------------
+  // Mark specs (dataviz): columns ≤ 24px with the rest of the band left as air, 4px rounded data end and a
+  // square baseline, a 2px surface gap between touching marks, 2px lines, markers r ≥ 4 with a surface ring.
   const PERIODS = D.model.periods.map((p) => p.label);
-  const SCENARIO_COLORS = { consensus: "--c-parent_secured", ttm: "--c-line", "run-rate": "--c-equity", stress: "--bad" };
-  const scenarioColor = (s) => css(SCENARIO_COLORS[s] || "--fg-muted");
+  const BAR_MAX = 24;
+  const GAP = 2;
 
   function prep(id) {
     const node = document.getElementById(id);
@@ -289,7 +292,7 @@
     return { svg, W };
   }
   function textWidth(svg, s) {
-    const t = svg.append("text").style("font-size", "11px").text(s);
+    const t = svg.append("text").style("font-size", "11.5px").text(s);
     const w = t.node().getComputedTextLength();
     t.remove();
     return w;
@@ -299,24 +302,66 @@
     svg.append("g").selectAll("line").data(ticks).join("line").attr("x1", x0).attr("x2", x1)
       .attr("y1", (d) => y(d)).attr("y2", (d) => y(d)).style("stroke", css("--line"));
   }
+  function axes(svg, x, y, ticks, fmt, ml, H, labels) {
+    svg.append("g").attr("class", "axis").attr("transform", `translate(${ml},0)`)
+      .call(d3.axisLeft(y).tickValues(ticks).tickSize(0).tickPadding(8).tickFormat(fmt)).select(".domain").remove();
+    const step = x.step ? x.step() : (x.range()[1] - x.range()[0]) / Math.max(1, labels.length - 1);
+    const every = Math.max(1, Math.ceil((d3.max(labels, (p) => textWidth(svg, p)) + 10) / Math.max(1, step)));
+    svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - 26})`)
+      .call(d3.axisBottom(x).tickValues(labels.filter((p, i) => i % every === 0)).tickSize(0).tickPadding(9));
+  }
   function legend(node, items) {
     node.replaceChildren();
     for (const it of items) {
       const s = el("span");
-      if (it.line) {
+      if (it.kind === "line" || it.kind === "dash") {
         const l = el("span", { class: "cw-line-sw" });
         l.style.borderTopColor = it.color;
-        if (it.dash) l.style.borderTopStyle = "dashed";
+        if (it.kind === "dash") l.style.borderTopStyle = "dashed";
         s.append(l);
+      } else if (it.kind === "bracket") {
+        const b = el("span", { class: "cw-bracket-sw" });
+        b.style.borderColor = it.color;
+        s.append(b);
       } else {
         const sw = el("span", { class: "cw-sw" });
         sw.style.background = it.color;
-        if (it.opacity) sw.style.opacity = it.opacity;
         s.append(sw);
       }
       s.append(document.createTextNode(it.label));
       node.append(s);
     }
+  }
+  // A column or bar segment: square where it starts, 4px rounded at its data end when it is the last segment.
+  function columnPath(x, yTop, yBottom, w, roundTop) {
+    const r = roundTop ? Math.min(4, yBottom - yTop, w / 2) : 0;
+    return `M${x},${yBottom}V${yTop + r}` +
+      (r > 0 ? `Q${x},${yTop} ${x + r},${yTop}H${x + w - r}Q${x + w},${yTop} ${x + w},${yTop + r}` : `H${x + w}`) +
+      `V${yBottom}Z`;
+  }
+  function barPath(x, yTop, len, h, roundEnd) {
+    const r = roundEnd ? Math.min(4, len, h / 2) : 0;
+    return `M${x},${yTop}H${x + len - r}` +
+      (r > 0 ? `Q${x + len},${yTop} ${x + len},${yTop + r}V${yTop + h - r}Q${x + len},${yTop + h} ${x + len - r},${yTop + h}` : `V${yTop + h}`) +
+      `H${x}Z`;
+  }
+  // Stacked column, bottom segment first, a 2px surface gap between segments.
+  function drawColumn(g, x, w, y, segments, fill) {
+    const live = segments.filter((s) => s.value > 1e-9);
+    let base = 0;
+    live.forEach((s, k) => {
+      const top = base + s.value;
+      const yBottom = y(base) - (k > 0 ? GAP : 0);
+      const yTop = y(top);
+      if (yBottom - yTop > 0.5) g.append("path").attr("d", columnPath(x, yTop, yBottom, w, k === live.length - 1)).style("fill", fill(s.key));
+      base = top;
+    });
+  }
+  function hoverBands(svg, x, H, labels, onMove, onClick) {
+    const band = svg.append("g").selectAll("rect").data(labels).join("rect").attr("class", "cw-hit")
+      .attr("x", (p) => x(p) - (x.step() - x.bandwidth()) / 2).attr("width", x.step()).attr("y", 0).attr("height", H - 26)
+      .style("fill", "transparent").on("pointermove", onMove).on("pointerleave", hideTip);
+    if (onClick) band.on("click", onClick);
   }
   const classesPresent = () => CLASSES.filter((c) => D.instruments.some((i) => i.seniority_class === c && balance(i) > 0));
   function serviceByPeriod() {
@@ -335,6 +380,7 @@
   }
   const scenarioValue = (s, p) => (D.model.scenarios.find((r) => r.scenario === s && r.period === p) || {}).ebitda;
   const instrumentRate = (i) => (isNum(D.market.bond_yields[i.name]) ? D.market.bond_yields[i.name] : allInRate(i));
+  const scenarioName = (s) => SCENARIO_LABELS[s] || s;
 
   // --- 2. capital structure ---------------------------------------------------------------------
   function drawStack() {
@@ -344,7 +390,7 @@
     if (!rows.length) return unavailable(node, "no debt to show");
     const rowH = 54, H = Math.max(220, rows.length * rowH);
     const { svg, W } = makeSvg(node, H);
-    const towerW = Math.max(48, Math.min(110, W * 0.2)), gapX = Math.max(24, Math.min(56, W * 0.07));
+    const towerW = Math.max(48, Math.min(96, W * 0.18)), gapX = Math.max(24, Math.min(56, W * 0.07));
     const tx = towerW + gapX + 8, avail = W - tx - 4;
     const y = d3.scaleLinear([0, 1], [2, H - 2]);
     const step = H / rows.length;
@@ -353,16 +399,17 @@
       const y0 = y(1 - detach), y1 = y(1 - r.attachment), ym = (y0 + y1) / 2, yl = i * step + step / 2;
       const c = color(r.seniority_class);
       const g = svg.append("g").attr("class", "cw-hit");
-      g.append("rect").attr("x", 0).attr("y", y0).attr("width", towerW).attr("height", Math.max(1.5, y1 - y0 - 1.5))
+      g.append("rect").attr("x", 0).attr("y", y0).attr("width", towerW).attr("height", Math.max(1.5, y1 - y0 - GAP))
         .attr("rx", 3).style("fill", c);
-      g.append("path").attr("d", `M${towerW + 2},${ym} C${towerW + gapX / 2},${ym} ${towerW + gapX / 2},${yl} ${towerW + gapX},${yl}`)
-        .style("fill", "none").style("stroke", c).style("stroke-width", 1.5);
-      g.append("circle").attr("cx", towerW + gapX).attr("cy", yl).attr("r", 3).style("fill", c);
+      g.append("path").attr("d", `M${towerW + 3},${ym} C${towerW + gapX / 2},${ym} ${towerW + gapX / 2},${yl} ${towerW + gapX},${yl}`)
+        .style("fill", "none").style("stroke", css("--axis")).style("stroke-width", 1.5);
+      g.append("circle").attr("cx", towerW + gapX).attr("cy", yl).attr("r", 4).style("fill", c)
+        .style("stroke", css("--panel")).style("stroke-width", 2);
       g.append("text").attr("x", tx).attr("y", yl - 4).style("fill", css("--fg")).style("font-size", "12.5px")
         .style("font-weight", 600).text(r.label);
       const variants = r.seniority_class === "equity"
         ? [`${money(r.amount)} · ${pct(r.share * 100, 0)} of capital · first loss`, money(r.amount)]
-        : [`${money(r.amount)} · ${pct(r.share * 100, 0)} of capital · ${pct(r.attachment * 100, 0)} cushion`,
+        : [`${money(r.amount)} · ${pct(r.share * 100, 0)} of capital · ${pct(r.attachment * 100, 0)} cushion below`,
            `${money(r.amount)} · ${pct(r.attachment * 100, 0)} cushion`, money(r.amount)];
       const t2 = g.append("text").attr("x", tx).attr("y", yl + 12);
       for (const v of variants) { t2.text(v); if (t2.node().getComputedTextLength() <= avail) break; }
@@ -379,8 +426,7 @@
   // --- 3. yield by tranche and maturity ----------------------------------------------------------
   function drawYield() {
     const node = prep("yield-chart");
-    const legendNode = document.getElementById("yield-legend");
-    legend(legendNode, classesPresent().map((c) => ({ color: color(c), label: LABELS[c] })));
+    legend(document.getElementById("yield-legend"), classesPresent().map((c) => ({ color: color(c), label: LABELS[c] })));
     if (SKIPPED) return unavailable(node, "instrument detail unavailable: " + SKIPPED);
     const rows = realInstruments().map((i) => ({ i, date: i.maturity ? new Date(i.maturity + "-15T00:00:00Z") : null,
                                                  p: balance(i), yv: instrumentRate(i) }))
@@ -395,7 +441,7 @@
     const y = d3.scaleLinear([0, d3.max(rows, (r) => r.yv) * 1.15], [H - 26, 14]).nice();
     const ticks = y.ticks(5);
     const ml = d3.max(ticks, (t) => textWidth(svg, t + "%")) + 10;
-    const rmax = Math.max(8, Math.min(22, W / 26));
+    const rmax = Math.max(8, Math.min(20, W / 28));
     const start = new Date(D.financials.period_end + "T00:00:00Z");
     const end = d3.max(rows, (r) => r.date);
     const x = d3.scaleUtc([d3.utcMonth.offset(start, -2), d3.utcMonth.offset(end, 6)], [ml + rmax, W - rmax - 4]);
@@ -404,16 +450,15 @@
     svg.append("g").attr("class", "axis").attr("transform", `translate(${ml},0)`)
       .call(d3.axisLeft(y).tickValues(ticks).tickSize(0).tickPadding(8).tickFormat((d) => d + "%")).select(".domain").remove();
     svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - 26})`)
-      .call(d3.axisBottom(x).ticks(W < 460 ? 4 : 8).tickSize(4).tickFormat(d3.utcFormat("%Y")));
+      .call(d3.axisBottom(x).ticks(W < 460 ? 4 : 8).tickSize(0).tickPadding(9).tickFormat(d3.utcFormat("%Y")));
     if (isNum(sofr)) {
       svg.append("line").attr("x1", ml).attr("x2", W).attr("y1", y(sofr)).attr("y2", y(sofr))
         .style("stroke", css("--fg-muted")).style("stroke-dasharray", "4 3");
-      svg.append("text").attr("x", W - 4).attr("y", y(sofr) - 5).attr("text-anchor", "end").text("SOFR " + pct(sofr, 2));
+      svg.append("text").attr("x", W - 4).attr("y", y(sofr) - 6).attr("text-anchor", "end").text("SOFR " + pct(sofr, 2));
     }
     svg.append("g").selectAll("circle").data(rows.sort((a, b) => b.p - a.p)).join("circle")
-      .attr("cx", (d) => x(d.date)).attr("cy", (d) => y(d.yv)).attr("r", (d) => Math.max(3, r(d.p)))
-      .style("fill", (d) => color(d.i.seniority_class)).style("fill-opacity", 0.72)
-      .style("stroke", (d) => color(d.i.seniority_class)).style("stroke-width", 1.5)
+      .attr("cx", (d) => x(d.date)).attr("cy", (d) => y(d.yv)).attr("r", (d) => Math.max(4, r(d.p)))
+      .style("fill", (d) => color(d.i.seniority_class)).style("stroke", css("--panel")).style("stroke-width", 2)
       .on("pointermove", (event, d) => showTip(event, d.i.name, [
         [d.i.seniority_class, isNum(D.market.bond_yields[d.i.name]) ? "Yield to worst" : "All-in coupon", pct(d.yv, 2)],
         [null, "Balance", money(d.p, 2)], [null, "Maturity", d3.utcFormat("%b %Y")(d.date)],
@@ -424,28 +469,29 @@
   // --- 4. debt by what it pays ---------------------------------------------------------------------
   function drawPaying() {
     const node = prep("paying-chart");
+    legend(document.getElementById("paying-legend"), classesPresent().map((c) => ({ color: color(c), label: LABELS[c] })));
     if (SKIPPED) return unavailable(node, "instrument detail unavailable: " + SKIPPED);
     const rows = realInstruments().map((i) => ({ i, p: balance(i),
       rate: isNum(i.effective_rate_pct) ? i.effective_rate_pct : allInRate(i),
       basis: isNum(i.effective_rate_pct) ? "effective" : "coupon" }))
       .filter((r) => r.p > 0 && isNum(r.rate)).sort((a, b) => b.rate - a.rate || b.p - a.p);
     if (!rows.length) return unavailable(node, "no instruments with a rate");
-    const rowH = 30, H = rows.length * rowH + 4;
+    const rowH = 28, barH = 12, H = rows.length * rowH + 4;
     const { svg, W } = makeSvg(node, H);
-    const rateW = 46, nameW = Math.min(240, Math.max(120, W * 0.34));
+    const rateW = 50, nameW = Math.min(250, Math.max(120, W * 0.34));
     const x = d3.scaleLinear([0, d3.max(rows, (r) => r.p)], [0, Math.max(40, W - rateW - nameW - 70)]);
-    const top = d3.max(rows, (r) => r.rate);
+    const top = rows[0].rate;
     rows.forEach((r, k) => {
       const yy = k * rowH + rowH / 2;
-      const hot = r.rate >= top - 1e-9;
+      const isTop = r.rate >= top - 1e-9;
       const g = svg.append("g").attr("class", "cw-hit");
-      g.append("text").attr("x", rateW - 6).attr("y", yy + 4).attr("text-anchor", "end")
-        .style("font-size", "13px").style("fill", hot ? css("--bad") : css("--fg-muted")).text(pct(r.rate, 1));
+      g.append("text").attr("x", rateW - 10).attr("y", yy + 4).attr("text-anchor", "end").style("font-size", "12.5px")
+        .style("fill", css(isTop ? "--fg" : "--fg-secondary")).style("font-weight", isTop ? 600 : 400).text(pct(r.rate, 1));
       const name = g.append("text").attr("x", rateW).attr("y", yy + 4).style("fill", css("--fg")).style("font-size", "12px").text(r.i.name);
-      while (name.node().getComputedTextLength() > nameW - 8 && name.text().length > 4) name.text(name.text().slice(0, -2) + "…");
-      g.append("rect").attr("x", rateW + nameW).attr("y", yy - 6).attr("height", 12).attr("rx", 3)
-        .attr("width", Math.max(2, x(r.p))).style("fill", hot ? css("--bad-fill") : color(r.i.seniority_class));
-      g.append("text").attr("x", rateW + nameW + Math.max(2, x(r.p)) + 6).attr("y", yy + 4).text(money(r.p, 2));
+      while (name.node().getComputedTextLength() > nameW - 10 && name.text().length > 4) name.text(name.text().slice(0, -2) + "…");
+      const len = Math.max(2, x(r.p));
+      g.append("path").attr("d", barPath(rateW + nameW, yy - barH / 2, len, barH, true)).style("fill", color(r.i.seniority_class));
+      g.append("text").attr("x", rateW + nameW + len + 6).attr("y", yy + 4).text(money(r.p, 2));
       g.on("pointermove", (event) => showTip(event, r.i.name, [
         [r.i.seniority_class, LABELS[r.i.seniority_class], money(r.p, 2)],
         [null, r.basis === "effective" ? "Effective rate" : "All-in coupon", pct(r.rate, 2)],
@@ -457,152 +503,159 @@
   // --- 5. payout wall ------------------------------------------------------------------------------
   function drawWall() {
     const node = prep("wall-chart");
-    const present = classesPresent();
     legend(document.getElementById("wall-legend"), [
-      ...present.map((c) => ({ color: color(c), label: LABELS[c] })),
-      { color: css("--c-line"), label: D.market.ebitda_label, line: true },
-      { color: css("--bad-fill"), label: "Not covered by EBITDA", opacity: 0.35 },
+      ...classesPresent().map((c) => ({ color: color(c), label: LABELS[c] })),
+      { kind: "line", color: css("--c-line"), label: scenarioName(state.scenario) + " " + D.market.ebitda_label },
+      { kind: "bracket", color: css("--bad"), label: "Gap: payout EBITDA does not cover" },
     ]);
     const rows = serviceByPeriod();
     if (!rows.some((o) => o.total > 0)) return unavailable(node, "no scheduled debt service");
-    const H = 310;
+    const H = 320;
     const { svg, W } = makeSvg(node, H);
     const ebitda = rows.map((o) => scenarioValue(state.scenario, o.period));
     const ymax = d3.max([...rows.map((o) => o.total), ...ebitda.filter(isNum)]);
-    const y = d3.scaleLinear([0, ymax * 1.1], [H - 26, 18]).nice();
+    const y = d3.scaleLinear([0, ymax * 1.12], [H - 26, 22]).nice();
     const ticks = y.ticks(5), fmt = axisMoney(ymax);
     const ml = d3.max(ticks, (t) => textWidth(svg, fmt(t))) + 10;
-    const x = d3.scaleBand(PERIODS, [ml, W - 4]).paddingInner(0.3).paddingOuter(0.15);
-    gridY(svg, y, ticks, ml, W);
-    svg.append("g").attr("class", "axis").attr("transform", `translate(${ml},0)`)
-      .call(d3.axisLeft(y).tickValues(ticks).tickSize(0).tickPadding(8).tickFormat(fmt)).select(".domain").remove();
-    const every = Math.max(1, Math.ceil((d3.max(PERIODS, (p) => textWidth(svg, p)) + 8) / x.step()));
-    svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - 26})`)
-      .call(d3.axisBottom(x).tickValues(PERIODS.filter((p, i) => i % every === 0)).tickSize(0).tickPadding(8));
-    const bw = x.bandwidth();
-    for (const s of d3.stack().keys(CLASSES)(rows)) {
-      svg.append("g").selectAll("rect").data(s.filter((d) => d[1] - d[0] > 1e-6)).join("rect")
-        .attr("x", (d) => x(d.data.period)).attr("width", bw).attr("y", (d) => y(d[1]))
-        .attr("height", (d) => Math.max(0.5, y(d[0]) - y(d[1]) - 1)).attr("rx", 2).style("fill", color(s.key));
+    const x = d3.scaleBand(PERIODS, [ml, W - 4]).paddingInner(0.2).paddingOuter(0.1);
+    const bw = Math.min(BAR_MAX, x.bandwidth());
+    const cx = (p) => x(p) + x.bandwidth() / 2;
+    if (state.period && PERIODS.includes(state.period)) {
+      svg.append("rect").attr("x", x(state.period)).attr("width", x.bandwidth()).attr("y", 6).attr("height", H - 32)
+        .attr("rx", 6).style("fill", css("--line")).style("opacity", 0.5);
     }
-    rows.forEach((o, k) => {
+    gridY(svg, y, ticks, ml, W);
+    axes(svg, x, y, ticks, fmt, ml, H, PERIODS);
+    const g = svg.append("g");
+    rows.forEach((o) => drawColumn(g, cx(o.period) - bw / 2, bw, y, CLASSES.map((c) => ({ key: c, value: o[c] })), color));
+    rows.forEach((o) => {
+      if (o.total > 0) svg.append("text").attr("x", cx(o.period)).attr("y", y(o.total) - 7).attr("text-anchor", "middle")
+        .style("fill", css("--fg")).style("font-weight", 600).text(money(o.total));
+    });
+    rows.forEach((o, k) => {  // the gap: a red bracket beside the column, from EBITDA up to the payout
       const e = ebitda[k];
       if (!isNum(e) || e >= o.total) return;
-      const top = y(o.total), bot = y(Math.max(0, e));
-      svg.append("rect").attr("x", x(o.period) - 3).attr("width", bw + 6).attr("y", top - 2).attr("height", bot - top + 2)
-        .attr("rx", 3).style("fill", css("--bad-fill")).style("fill-opacity", 0.22).style("stroke", css("--bad-fill")).style("stroke-width", 1.5);
+      const bx = cx(o.period) + bw / 2 + 6, yt = y(o.total), yb = y(Math.max(0, e));
+      svg.append("path").attr("d", `M${bx - 4},${yt}H${bx}V${yb}H${bx - 4}`).style("fill", "none")
+        .style("stroke", css("--bad")).style("stroke-width", 2).style("stroke-linejoin", "round");
+      // Label only gaps tall enough to clear the EBITDA line; small ones keep the bracket and the tooltip.
+      if (yb - yt < 18) return;
+      const room = Math.min(x.step() - bw - 16, W - bx - 8);  // the air up to the next column or the edge
+      const t = svg.append("text").attr("x", bx + 5).attr("y", (yt + yb) / 2 + 4).text("gap " + money(o.total - Math.max(0, e)));
+      if (t.node().getComputedTextLength() > room) t.text(money(o.total - Math.max(0, e)));
+      if (t.node().getComputedTextLength() > room) t.remove();
     });
-    const sel = rows.find((o) => o.period === state.period);
-    if (sel) svg.append("rect").attr("x", x(sel.period) - 5).attr("width", bw + 10).attr("y", y(sel.total) - 5)
-      .attr("height", y(0) - y(sel.total) + 5).attr("rx", 4).style("fill", "none").style("stroke", css("--fg"))
-      .style("stroke-dasharray", "3 2");
-    const labels = rows.map((o) => money(o.total));
-    if (x.step() >= d3.max(labels, (s) => textWidth(svg, s)) + 6) {
-      rows.forEach((o, k) => svg.append("text").attr("x", x(o.period) + bw / 2).attr("y", y(o.total) - 6)
-        .attr("text-anchor", "middle").text(labels[k]));
-    }
-    const pts = rows.map((o, k) => ({ x: x(o.period) + bw / 2, y: isNum(ebitda[k]) ? y(Math.max(0, ebitda[k])) : null }))
-      .filter((p) => p.y != null);
+    const pts = rows.map((o, k) => ({ x: cx(o.period), v: ebitda[k] })).filter((p) => isNum(p.v));
     if (pts.length) {
-      svg.append("path").attr("d", d3.line().x((d) => d.x).y((d) => d.y)(pts)).style("fill", "none")
-        .style("stroke", css("--c-line")).style("stroke-width", 2);
-      svg.append("g").selectAll("circle").data(pts).join("circle").attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", 3.5)
-        .style("fill", css("--panel")).style("stroke", css("--c-line")).style("stroke-width", 2);
+      svg.append("path").attr("d", d3.line().x((d) => d.x).y((d) => y(Math.max(0, d.v)))(pts)).style("fill", "none")
+        .style("stroke", css("--c-line")).style("stroke-width", 2).style("stroke-linejoin", "round").style("stroke-linecap", "round");
+      svg.append("g").selectAll("circle").data(pts).join("circle").attr("cx", (d) => d.x).attr("cy", (d) => y(Math.max(0, d.v)))
+        .attr("r", 4).style("fill", css("--c-line")).style("stroke", css("--panel")).style("stroke-width", 2);
     }
-    svg.append("g").selectAll("rect").data(rows).join("rect").attr("class", "cw-hit")
-      .attr("x", (o) => x(o.period) - (x.step() - bw) / 2).attr("width", x.step()).attr("y", 0).attr("height", H - 26)
-      .style("fill", "transparent")
-      .on("pointermove", (event, o) => {
-        const e = scenarioValue(state.scenario, o.period);
-        showTip(event, o.period + (state.scenario ? " · " + (SCENARIO_LABELS[state.scenario] || state.scenario) : ""), [
-          ...CLASSES.slice().reverse().filter((c) => o[c] > 1e-6).map((c) =>
-            [c, LABELS[c] + " · int " + money(o[c + "_i"]) + " + prin " + money(o[c + "_p"]), money(o[c])]),
-          [null, "Total payout", money(o.total)],
-          ...(isNum(e) ? [["line", D.market.ebitda_label, money(e)], [null, "Coverage", times(o.total ? e / o.total : null)]] : []),
-        ]);
-      })
-      .on("pointerleave", hideTip)
-      .on("click", (event, o) => { state.period = o.period; drawWall(); drawWaterfall(); });
+    hoverBands(svg, x, H, PERIODS, (event, p) => {
+      const o = rows.find((r) => r.period === p), e = scenarioValue(state.scenario, p);
+      showTip(event, p + " · " + scenarioName(state.scenario), [
+        ...CLASSES.slice().reverse().filter((c) => o[c] > 1e-6).map((c) =>
+          [c, LABELS[c] + " · interest " + money(o[c + "_i"]) + " + principal " + money(o[c + "_p"]), money(o[c])]),
+        [null, "Total payout", money(o.total)],
+        ...(isNum(e) ? [["line", D.market.ebitda_label, money(e)],
+                        [null, e >= o.total ? "Covered" : "Gap", e >= o.total ? times(o.total ? e / o.total : null) : money(o.total - e)]] : []),
+      ]);
+    }, (event, p) => { state.period = p; drawWall(); drawWaterfall(); });
   }
 
   // --- 6. coverage ---------------------------------------------------------------------------------
+  // One highlighted line (the scenario chosen above), the others in gray: emphasis instead of four hues.
   function drawCoverage() {
     const node = prep("coverage-chart");
     const names = [...new Set(D.model.coverage.map((r) => r.scenario))];
+    const sel = names.includes(state.scenario) ? state.scenario : names[0];
     legend(document.getElementById("coverage-legend"), [
-      ...names.map((s) => ({ color: scenarioColor(s), label: SCENARIO_LABELS[s] || s, line: true })),
-      { color: css("--bad"), label: "1.0x", line: true, dash: true },
+      ...(sel ? [{ kind: "line", color: css("--c-highlight"), label: scenarioName(sel) + " (chosen above)" }] : []),
+      ...(names.length > 1 ? [{ kind: "line", color: css("--c-context"), label: "Other scenarios" }] : []),
+      { kind: "dash", color: css("--bad"), label: "1.0x: payout just covered" },
     ]);
     const rows = D.model.coverage.filter((r) => isNum(r.dscr));
     if (!rows.length) return unavailable(node, "no coverage: EBITDA or debt service missing");
     const H = 260, CAP = 10;
     const { svg, W } = makeSvg(node, H);
     const ymax = Math.min(CAP, Math.max(1.5, d3.max(rows, (r) => r.dscr) * 1.1));
-    const y = d3.scaleLinear([Math.min(0, d3.min(rows, (r) => r.dscr)), ymax], [H - 26, 12]).nice();
+    const y = d3.scaleLinear([Math.min(0, d3.min(rows, (r) => r.dscr)), ymax], [H - 26, 14]).nice();
     const ticks = y.ticks(5);
     const ml = d3.max(ticks, (t) => textWidth(svg, t + "x")) + 10;
-    const x = d3.scalePoint(PERIODS, [ml + 12, W - 12]);
+    const endRoom = 64;
+    const x = d3.scalePoint(PERIODS, [ml + 12, W - endRoom]);
     gridY(svg, y, ticks, ml, W);
-    svg.append("g").attr("class", "axis").attr("transform", `translate(${ml},0)`)
-      .call(d3.axisLeft(y).tickValues(ticks).tickSize(0).tickPadding(8).tickFormat((d) => d + "x")).select(".domain").remove();
-    const every = Math.max(1, Math.ceil((d3.max(PERIODS, (p) => textWidth(svg, p)) + 8) / Math.max(1, x.step())));
-    svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - 26})`)
-      .call(d3.axisBottom(x).tickValues(PERIODS.filter((p, i) => i % every === 0)).tickSize(0).tickPadding(8));
-    svg.append("line").attr("x1", ml).attr("x2", W).attr("y1", y(1)).attr("y2", y(1))
-      .style("stroke", css("--bad")).style("stroke-dasharray", "4 3");
-    for (const s of names) {
-      const pts = PERIODS.map((p) => rows.find((r) => r.scenario === s && r.period === p))
-        .filter(Boolean).map((r) => ({ r, x: x(r.period), y: y(Math.min(r.dscr, ymax)) }));
-      svg.append("path").attr("d", d3.line().x((d) => d.x).y((d) => d.y)(pts)).style("fill", "none")
-        .style("stroke", scenarioColor(s)).style("stroke-width", 2);
-      svg.append("g").selectAll("circle").data(pts).join("circle").attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", 3)
-        .style("fill", scenarioColor(s))
-        .on("pointermove", (event, d) => showTip(event, d.r.period + " · " + (SCENARIO_LABELS[s] || s),
-          [[null, "Coverage", times(d.r.dscr) + (d.r.dscr > ymax ? " (off scale)" : "")]]))
-        .on("pointerleave", hideTip);
+    axes(svg, x, y, ticks, (d) => d + "x", ml, H, PERIODS);
+    svg.append("line").attr("x1", ml).attr("x2", W - endRoom + 8).attr("y1", y(1)).attr("y2", y(1))
+      .style("stroke", css("--bad")).style("stroke-width", 1.5).style("stroke-dasharray", "5 4");
+    svg.append("text").attr("x", W - endRoom + 12).attr("y", y(1) + 4).text("1.0x");
+    const series = (s) => PERIODS.map((p) => rows.find((r) => r.scenario === s && r.period === p)).filter(Boolean);
+    const line = d3.line().x((r) => x(r.period)).y((r) => y(Math.min(r.dscr, ymax)));
+    for (const s of names.filter((n) => n !== sel)) {
+      svg.append("path").attr("d", line(series(s))).style("fill", "none").style("stroke", css("--c-context"))
+        .style("stroke-width", 1.5).style("stroke-linejoin", "round");
     }
+    if (sel) {
+      const pts = series(sel);
+      svg.append("path").attr("d", line(pts)).style("fill", "none").style("stroke", css("--c-highlight"))
+        .style("stroke-width", 2).style("stroke-linejoin", "round").style("stroke-linecap", "round");
+      svg.append("g").selectAll("circle").data(pts).join("circle").attr("cx", (r) => x(r.period))
+        .attr("cy", (r) => y(Math.min(r.dscr, ymax))).attr("r", 4).style("fill", css("--c-highlight"))
+        .style("stroke", css("--panel")).style("stroke-width", 2);
+      const last = pts[pts.length - 1];
+      if (last) svg.append("text").attr("x", x(last.period) + 8).attr("y", y(Math.min(last.dscr, ymax)) + 4)
+        .style("fill", css("--fg")).style("font-weight", 600).text(times(last.dscr));
+    }
+    const step = PERIODS.length > 1 ? x.step() : W - ml;
+    svg.append("g").selectAll("rect").data(PERIODS).join("rect").attr("class", "cw-hit")
+      .attr("x", (p) => x(p) - step / 2).attr("width", step).attr("y", 0).attr("height", H - 26).style("fill", "transparent")
+      .on("pointermove", (event, p) => showTip(event, p + " · coverage", names.map((s) => {
+        const r = rows.find((q) => q.scenario === s && q.period === p);
+        return [s === sel ? "line" : null, scenarioName(s), r ? times(r.dscr) : "—"];
+      }))).on("pointerleave", hideTip);
   }
 
   // --- 7. cash to raise ------------------------------------------------------------------------------
   function drawRaise() {
     const node = prep("raise-chart");
     legend(document.getElementById("raise-legend"), [
-      { color: css("--c-equity"), label: "Covered by cash from operations" },
-      { color: css("--bad-fill"), label: "To raise" },
+      { color: css("--c-covered"), label: "Paid from operating cash flow" },
+      { color: css("--bad"), label: "To raise from new debt or equity" },
     ]);
     const rows = D.model.raise_rows;
     if (!rows.length) return unavailable(node, "no capex reported, so cash to raise cannot be estimated");
     const hasConsensus = D.market.consensus.some((c) => isNum(c.capex) || isNum(c.cfo));
     const total = d3.sum(rows, (r) => r.to_raise);
     document.getElementById("raise-note").textContent = "Capex plus scheduled principal, less cash from operations (" +
-      (hasConsensus ? "consensus" : "TTM held flat") + "). " + money(total) + " to raise across the period shown; " +
-      "the floor leaves out repaying new debt.";
+      (hasConsensus ? "consensus" : "TTM held flat") + "). " + money(total) + " to raise across the years shown; " +
+      "a floor, since it leaves out repaying the new debt itself.";
     const H = 260;
     const { svg, W } = makeSvg(node, H);
     const need = rows.map((r) => r.capex + r.principal);
     const ymax = d3.max(need);
-    const y = d3.scaleLinear([0, ymax * 1.1 || 1], [H - 26, 12]).nice();
+    const y = d3.scaleLinear([0, ymax * 1.12 || 1], [H - 26, 16]).nice();
     const ticks = y.ticks(5), fmt = axisMoney(ymax);
     const ml = d3.max(ticks, (t) => textWidth(svg, fmt(t))) + 10;
-    const x = d3.scaleBand(rows.map((r) => r.period), [ml, W - 4]).paddingInner(0.3).paddingOuter(0.15);
+    const labels = rows.map((r) => r.period);
+    const x = d3.scaleBand(labels, [ml, W - 4]).paddingInner(0.2).paddingOuter(0.1);
+    const bw = Math.min(BAR_MAX, x.bandwidth());
     gridY(svg, y, ticks, ml, W);
-    svg.append("g").attr("class", "axis").attr("transform", `translate(${ml},0)`)
-      .call(d3.axisLeft(y).tickValues(ticks).tickSize(0).tickPadding(8).tickFormat(fmt)).select(".domain").remove();
-    const every = Math.max(1, Math.ceil((d3.max(rows, (r) => textWidth(svg, r.period)) + 8) / x.step()));
-    svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - 26})`)
-      .call(d3.axisBottom(x).tickValues(rows.map((r) => r.period).filter((p, i) => i % every === 0)).tickSize(0).tickPadding(8));
+    axes(svg, x, y, ticks, fmt, ml, H, labels);
+    const g = svg.append("g");
     rows.forEach((r, k) => {
-      const covered = need[k] - r.to_raise;
-      const g = svg.append("g").attr("class", "cw-hit");
-      g.append("rect").attr("x", x(r.period)).attr("width", x.bandwidth()).attr("y", y(covered))
-        .attr("height", Math.max(0, y(0) - y(covered))).attr("rx", 2).style("fill", css("--c-equity"));
-      if (r.to_raise > 0) g.append("rect").attr("x", x(r.period)).attr("width", x.bandwidth()).attr("y", y(need[k]))
-        .attr("height", Math.max(0.5, y(covered) - y(need[k]) - 1)).attr("rx", 2).style("fill", css("--bad-fill"));
-      g.append("rect").attr("x", x(r.period)).attr("width", x.bandwidth()).attr("y", 0).attr("height", H - 26).style("fill", "transparent")
-        .on("pointermove", (event) => showTip(event, r.period, [
-          [null, "Capex", money(r.capex)], [null, "Scheduled principal", money(r.principal)],
-          [null, "Cash from operations", money(r.cfo)], [null, "To raise", money(r.to_raise)],
-        ])).on("pointerleave", hideTip);
+      const cx = x(r.period) + x.bandwidth() / 2;
+      drawColumn(g, cx - bw / 2, bw, y, [{ key: "covered", value: need[k] - r.to_raise }, { key: "raise", value: r.to_raise }],
+                 (key) => css(key === "raise" ? "--bad" : "--c-covered"));
+      const label = r.to_raise > 0 ? money(r.to_raise) : "covered";
+      const t = svg.append("text").attr("x", cx).attr("y", y(need[k]) - 7).attr("text-anchor", "middle")
+        .style("fill", css(r.to_raise > 0 ? "--fg" : "--fg-muted")).style("font-weight", r.to_raise > 0 ? 600 : 400).text(label);
+      if (t.node().getComputedTextLength() > x.step() - 4) t.remove();
+    });
+    hoverBands(svg, x, H, labels, (event, p) => {
+      const r = rows.find((q) => q.period === p);
+      showTip(event, p, [[null, "Capex", money(r.capex)], [null, "Scheduled principal", money(r.principal)],
+                         [null, "Cash from operations", money(r.cfo)], ["raise", "To raise", money(r.to_raise)]]);
     });
   }
 
@@ -611,6 +664,10 @@
     const node = prep("waterfall-chart");
     const chips = document.getElementById("waterfall-years");
     chips.replaceChildren();
+    legend(document.getElementById("waterfall-legend"), SKIPPED ? [] : [
+      { color: css("--c-asset_level_secured"), label: "Paid (class color)" },
+      { color: css("--bad"), label: "Not paid: EBITDA ran out" },
+    ]);
     if (SKIPPED) return unavailable(node, "instrument detail unavailable: " + SKIPPED);
     if (!PERIODS.length || !state.scenario) return unavailable(node, "no EBITDA scenario to allocate");
     if (!state.period) state.period = PERIODS.length > 1 ? PERIODS[1] : PERIODS[0];
@@ -622,36 +679,35 @@
     const rows = D.model.waterfall.filter((r) => r.period === state.period && r.scenario === state.scenario);
     const e = scenarioValue(state.scenario, state.period);
     const due = d3.sum(rows, (r) => r.due), paid = d3.sum(rows, (r) => r.paid);
-    node.append(el("p", { class: "cw-note" }, (SCENARIO_LABELS[state.scenario] || state.scenario) + " " +
-      D.market.ebitda_label + " " + money(e) + " against " + money(due) + " of interest and principal; " +
+    node.append(el("p", { class: "cw-note" }, scenarioName(state.scenario) + " " + D.market.ebitda_label + " of " +
+      money(e) + " against " + money(due) + " of interest and principal in " + state.period + ": " +
       (isNum(e) && e >= due ? money(e - paid) + " left after debt service." : money(due - paid) + " not covered.")));
     if (!rows.length) return;
-    const rowH = 40, H = rows.length * rowH + 8;
+    const rowH = 36, barH = 14, H = rows.length * rowH + 6;
     const { svg, W } = makeSvg(node, H);
-    const labelW = Math.min(170, Math.max(110, W * 0.28));
-    const x = d3.scaleLinear([0, d3.max(rows, (r) => r.due)], [0, Math.max(40, W - labelW - 90)]);
+    const labelW = Math.min(170, Math.max(110, W * 0.24));
+    const x = d3.scaleLinear([0, d3.max(rows, (r) => r.due)], [0, Math.max(40, W - labelW - 200)]);
     rows.forEach((r, k) => {
-      const yy = k * rowH + 8;
+      const yy = k * rowH + 10;
       const g = svg.append("g").attr("class", "cw-hit");
-      g.append("text").attr("x", 0).attr("y", yy + 13).style("fill", css("--fg")).style("font-size", "12px").text(LABELS[r.seniority_class]);
-      g.append("rect").attr("x", labelW).attr("y", yy).attr("width", Math.max(1, x(r.due))).attr("height", 18).attr("rx", 3)
-        .style("fill", "none").style("stroke", css("--line"));
-      g.append("rect").attr("x", labelW).attr("y", yy).attr("width", x(r.paid)).attr("height", 18).attr("rx", 3)
-        .style("fill", color(r.seniority_class));
-      if (r.shortfall > 1e-6) g.append("rect").attr("x", labelW + x(r.paid)).attr("y", yy)
-        .attr("width", Math.max(1, x(r.shortfall))).attr("height", 18).attr("rx", 3)
-        .style("fill", css("--bad-fill")).style("fill-opacity", 0.35).style("stroke", css("--bad-fill"));
-      g.append("text").attr("x", labelW + x(r.due) + 6).attr("y", yy + 13)
-        .text(r.shortfall > 1e-6 ? money(r.paid) + " of " + money(r.due) : money(r.due));
+      g.append("text").attr("x", 0).attr("y", yy + barH - 2).style("fill", css("--fg")).style("font-size", "12px").text(LABELS[r.seniority_class]);
+      const paidLen = x(r.paid), shortLen = x(r.shortfall);
+      const short = r.shortfall > 1e-6;
+      if (paidLen > 0.5) g.append("path").attr("d", barPath(labelW, yy, paidLen, barH, !short)).style("fill", color(r.seniority_class));
+      if (short) g.append("path").attr("d", barPath(labelW + paidLen + (paidLen > 0.5 ? GAP : 0), yy, Math.max(2, shortLen - (paidLen > 0.5 ? GAP : 0)), barH, true))
+        .style("fill", css("--bad"));
+      g.append("text").attr("x", labelW + x(r.due) + 8).attr("y", yy + barH - 2)
+        .text(short ? `${money(r.paid)} of ${money(r.due)} paid · ${money(r.shortfall)} short` : `${money(r.due)} paid in full`);
       g.on("pointermove", (event) => showTip(event, LABELS[r.seniority_class] + " · " + r.period, [
         [null, "Due (interest + principal)", money(r.due, 2)], [r.seniority_class, "Paid", money(r.paid, 2)],
-        [null, "Shortfall", money(r.shortfall, 2)],
+        ["raise", "Not paid", money(r.shortfall, 2)],
       ])).on("pointerleave", hideTip);
     });
   }
 
   function drawScenarioCharts() {
     drawWall();
+    drawCoverage();
     drawWaterfall();
   }
 
@@ -683,5 +739,4 @@
       drawCharts();
     }, 150);
   });
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawCharts);
 })();
