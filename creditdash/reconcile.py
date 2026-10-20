@@ -48,11 +48,12 @@ def reconcile(extraction: Extraction | None, financials: Financials,
                     setattr(i, f, getattr(i, f) * scale)
         notes.append(f"rescaled extraction by {scale:g} to $ millions")
 
-    normalized = {k: normalize(v) for k, v in sources.items()}
+    # A quote verifies if it appears in any filing text the model was given: an instrument's balance can come
+    # from the 10-Q while its coupon and maturity are quoted from the 10-K.
+    normalized = [normalize(v) for v in sources.values()]
     unverified = []
     for i in instruments:
-        text = normalized.get(i.source)
-        i.verified = bool(i.quotes) and text is not None and all(normalize(q) in text for q in i.quotes)
+        i.verified = bool(i.quotes) and all(any(normalize(q) in t for t in normalized) for q in i.quotes)
         if not i.verified:
             unverified.append(i.name)
 

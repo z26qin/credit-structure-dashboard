@@ -71,7 +71,7 @@ def test_category_totals_follow_the_schedule_by_balance():  # CHTR reports debt 
     out = run_model(cats, FIN, MKT, SETTINGS)
     p = principal_by(out)
     assert p[("Senior unsecured notes", "2027")] == approx(240) and p[("Credit facilities", "2027")] == approx(160)
-    assert out.excluded == []
+    assert out.excluded == [] and out.fit_error == approx(0, abs=0.01)  # measured on the final schedule
     i = interest_by(out)  # same schedule shape, so interest per dollar shows the rate: 5.5% (SOFR 4 + 1.5) vs 5%
     assert i[("Credit facilities", "2H26")] / 400 == approx(i[("Senior unsecured notes", "2H26")] / 600 * 5.5 / 5)
 

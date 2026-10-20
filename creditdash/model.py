@@ -130,6 +130,7 @@ def run_model(instruments: list[Instrument], financials: Financials, market: Mar
                              flexible=True)
                 loan.alloc = {k: v * share for k, v in residual.items()}
                 loans.append(loan)
+            fit_error = _schedule_error(loans, financials, periods)
     service = _simulate(loans, months, label_of)
 
     scenarios = _scenarios(financials, market, periods, settings)
@@ -204,11 +205,16 @@ def _fit(loans: list[_Loan], financials: Financials, periods, months, label_of, 
                     l.alloc = {k: v * l.principal / total for k, v in l.alloc.items()}
                 elif l.principal > 0:  # every bucket it spans was already full: repay at maturity
                     l.alloc = {label_of(l.maturity): l.principal}
-        error = max(abs(sum(v for l in loans for k, v in l.alloc.items() if k in labels) - reported)
-                    for labels, reported in buckets)
+        error = _schedule_error(loans, financials, periods)
         if error < 1e-6:
             break
     return error
+
+
+def _schedule_error(loans: list[_Loan], financials: Financials, periods: list[Period]) -> float:
+    """Largest gap, over the reported buckets, between scheduled and reported principal."""
+    return max((abs(sum(v for l in loans for k, v in l.alloc.items() if k in labels) - reported)
+                for labels, reported in _buckets(financials, periods)), default=0.0)
 
 
 def _buckets(financials: Financials, periods: list[Period]) -> list[tuple[set[str], float]]:

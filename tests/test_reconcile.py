@@ -58,8 +58,15 @@ def test_quote_matches_after_normalizing():
     assert rec.unverified == []
 
 
-def test_missing_source_is_unverified():
-    rec, _ = reconcile(ext(inst("X", 1000).model_copy(update={"source": "B"})), fin(), SOURCES)
+def test_quote_from_another_sent_filing_verifies():  # balance from the 10-Q, detail quoted from the 10-K
+    sources = {"A": SOURCE, "K": "| Term Loan | September 2029 | SOFR + 4.25% | $400 |"}
+    quote = "| Term Loan | September 2029 | SOFR + 4.25% | $400 |"
+    rec, _ = reconcile(ext(inst("Term Loan", 1000, quote=quote)), fin(), sources)
+    assert rec.unverified == []
+
+
+def test_quote_in_no_sent_filing_is_unverified():
+    rec, _ = reconcile(ext(inst("X", 1000, quote="made up").model_copy(update={"source": "B"})), fin(), SOURCES)
     assert rec.unverified == ["X"]
 
 

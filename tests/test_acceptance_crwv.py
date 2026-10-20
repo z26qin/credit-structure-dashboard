@@ -23,7 +23,8 @@ def checked(edgar, extraction):
     r = resolve("CRWV", edgar)
     instance = (FIXTURES / "instance.xml").read_text()
     eight_ks = {K1: (FIXTURES / "8k-20260807.htm").read_text(), K2: (FIXTURES / "8k-20260917.htm").read_text()}
-    _, sources = build_inputs(r, instance, lambda: "", eight_ks)
+    annual = (FIXTURES / "instance-10k.xml").read_text()
+    _, sources = build_inputs(r, instance, lambda: "", eight_ks, annual)
     fin = build_financials(json.loads((FIXTURES / "companyfacts.json").read_text()), instance, r.periodic.period_end,
                            "1231", r.periodic.accession)
     return reconcile(extraction, fin, sources)

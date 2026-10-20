@@ -1,24 +1,24 @@
 {
  "period_end": "2026-06-30",
- "unit_note": "Amounts are reported in $ millions as shown in the filing; no conversion needed. The 2032 EUR Senior Notes are shown at the USD amount in the table ($2,279 million) with the €2,000 million principal in EUR.",
+ "unit_note": "All amounts are in $ millions; the 10-Q and 10-K debt tables report dollars in millions. Principal is outstanding principal before unamortized discount and issuance costs.",
  "instruments": [
   {
    "name": "DDTL 1.0 Facility",
    "kind": "delayed_draw_term_loan",
-   "seniority_class": "other",
+   "seniority_class": "parent_secured",
    "borrower": null,
    "recourse_to_parent": true,
-   "security": null,
+   "security": "equity interests and assets of subsidiaries",
    "principal": 1300.0,
    "post_period_change": null,
-   "commitment": null,
+   "commitment": 2300.0,
    "rate_type": "unknown",
    "fixed_rate_pct": null,
    "spread_pct": null,
    "benchmark": null,
    "effective_rate_pct": 15.0,
    "maturity": "2028-03",
-   "amortization": "unknown",
+   "amortization": "amortizing",
    "currency": "USD",
    "source": "0001769628-26-000366",
    "quotes": [
@@ -28,20 +28,20 @@
   {
    "name": "DDTL 2.0 Facility",
    "kind": "delayed_draw_term_loan",
-   "seniority_class": "other",
+   "seniority_class": "parent_secured",
    "borrower": null,
    "recourse_to_parent": true,
-   "security": null,
+   "security": "equity interests and assets of subsidiaries",
    "principal": 3190.0,
    "post_period_change": null,
-   "commitment": null,
+   "commitment": 7600.0,
    "rate_type": "unknown",
    "fixed_rate_pct": null,
    "spread_pct": null,
    "benchmark": null,
    "effective_rate_pct": 11.0,
    "maturity": "2030-08",
-   "amortization": "unknown",
+   "amortization": "amortizing",
    "currency": "USD",
    "source": "0001769628-26-000366",
    "quotes": [
@@ -51,47 +51,49 @@
   {
    "name": "DDTL 2.1 Facility",
    "kind": "delayed_draw_term_loan",
-   "seniority_class": "other",
+   "seniority_class": "parent_secured",
    "borrower": null,
    "recourse_to_parent": true,
-   "security": null,
+   "security": "equity interests and assets of subsidiaries",
    "principal": 3000.0,
    "post_period_change": null,
-   "commitment": null,
-   "rate_type": "unknown",
+   "commitment": 3000.0,
+   "rate_type": "floating",
    "fixed_rate_pct": null,
-   "spread_pct": null,
-   "benchmark": null,
+   "spread_pct": 4.25,
+   "benchmark": "SOFR",
    "effective_rate_pct": 9.0,
    "maturity": "2031-03",
-   "amortization": "unknown",
+   "amortization": "amortizing",
    "currency": "USD",
    "source": "0001769628-26-000366",
    "quotes": [
-    "| DDTL 2.1 Facility | Mar 2031 | 9% | 3,000 | 2,741 |"
+    "| DDTL 2.1 Facility | Mar 2031 | 9% | 3,000 | 2,741 |",
+    "| DDTL 2.1 Facility | September 2025 | SOFR + 4.25% | $3,000 |"
    ]
   },
   {
    "name": "DDTL 3.0 Facility",
    "kind": "delayed_draw_term_loan",
-   "seniority_class": "other",
+   "seniority_class": "parent_secured",
    "borrower": null,
    "recourse_to_parent": true,
-   "security": null,
+   "security": "equity interests and assets of subsidiaries",
    "principal": 2215.0,
    "post_period_change": null,
-   "commitment": null,
-   "rate_type": "unknown",
+   "commitment": 2600.0,
+   "rate_type": "floating",
    "fixed_rate_pct": null,
-   "spread_pct": null,
-   "benchmark": null,
+   "spread_pct": 4.0,
+   "benchmark": "SOFR",
    "effective_rate_pct": 9.0,
    "maturity": "2030-08",
-   "amortization": "unknown",
+   "amortization": "amortizing",
    "currency": "USD",
    "source": "0001769628-26-000366",
    "quotes": [
-    "| DDTL 3.0 Facility | Aug 2030 | 9% | 2,215 | 340 |"
+    "| DDTL 3.0 Facility | Aug 2030 | 9% | 2,215 | 340 |",
+    "| DDTL 3.0 Facility | July 2025 | SOFR + 4.00% | 2,600 |"
    ]
   },
   {
@@ -100,10 +102,10 @@
    "seniority_class": "asset_level_secured",
    "borrower": "CoreWeave Financing DDTL V, LLC",
    "recourse_to_parent": true,
-   "security": "equity interests of the subsidiaries and substantially all of their assets",
+   "security": "equity interests and substantially all assets of CFD V",
    "principal": 1101.0,
    "post_period_change": null,
-   "commitment": null,
+   "commitment": 3100.0,
    "rate_type": "floating",
    "fixed_rate_pct": null,
    "spread_pct": 4.5,
@@ -115,8 +117,7 @@
    "source": "0001769628-26-000366",
    "quotes": [
     "| DDTL 5.0 Facility | Nov 2031 | 9% | 1,101 | — |",
-    "| DDTL 5.0 Facility | May 2026 | SOFR + 4.50% | $3,100 |",
-    "The principal amount of the DDTL 5.0 Facility is required to be repaid in monthly installments, beginning in November 2026, with the expected final payment due in May 2031."
+    "| DDTL 5.0 Facility | May 2026 | SOFR + 4.50% | $3,100 |"
    ]
   },
   {
@@ -130,7 +131,7 @@
    "post_period_change": null,
    "commitment": null,
    "rate_type": "fixed",
-   "fixed_rate_pct": null,
+   "fixed_rate_pct": 9.25,
    "spread_pct": null,
    "benchmark": null,
    "effective_rate_pct": 10.0,
@@ -185,8 +186,7 @@
    "currency": "USD",
    "source": "0001769628-26-000366",
    "quotes": [
-    "| 2031 9.75% Senior Notes | Oct 2031 | 10% | 2,750 | — |",
-    "| 2031 9.75% Senior Notes | April 2026 | 9.75% | $2,750 |"
+    "| 2031 9.75% Senior Notes | Oct 2031 | 10% | 2,750 | — |"
    ]
   },
   {
@@ -209,8 +209,7 @@
    "currency": "USD",
    "source": "0001769628-26-000366",
    "quotes": [
-    "| 2032 9.625% Senior Notes | Jul 2032 | 10% | 1,250 | — |",
-    "| 2032 9.625% Senior Notes | June 2026 | 9.625% | $1,250 |"
+    "| 2032 9.625% Senior Notes | Jul 2032 | 10% | 1,250 | — |"
    ]
   },
   {
@@ -248,7 +247,7 @@
    "post_period_change": null,
    "commitment": null,
    "rate_type": "fixed",
-   "fixed_rate_pct": null,
+   "fixed_rate_pct": 1.75,
    "spread_pct": null,
    "benchmark": null,
    "effective_rate_pct": 2.0,
@@ -281,8 +280,7 @@
    "source": "0001769628-26-000366",
    "quotes": [
     "| 2032 Convertible Senior Notes | Oct 2032 | 2% | 4,000 | — |",
-    "| 2032 Convertible Senior Notes | April 2026 | 1.75% | $4,000 |",
-    "The 2032 Convertible Senior Notes are unsecured obligations and bear interest payable semi-annually in arrears"
+    "| 2032 Convertible Senior Notes | April 2026 | 1.75% | $4,000 |"
    ]
   },
   {
@@ -290,13 +288,13 @@
    "kind": "convertible_notes",
    "seniority_class": "convertible",
    "borrower": null,
-   "recourse_to_parent": null,
+   "recourse_to_parent": true,
    "security": "unsecured",
    "principal": 0.0,
    "post_period_change": null,
    "commitment": null,
-   "rate_type": "fixed",
-   "fixed_rate_pct": 0.0,
+   "rate_type": "unknown",
+   "fixed_rate_pct": null,
    "spread_pct": null,
    "benchmark": null,
    "effective_rate_pct": 7.0,
@@ -305,8 +303,7 @@
    "currency": "USD",
    "source": "0001769628-26-000366",
    "quotes": [
-    "| Convertible Promissory Notes | Apr 2026 | 7% | — | 168 |",
-    "In April 2026, the Company settled in full the convertible promissory notes at a conversion price of $106.61 per share."
+    "| Convertible Promissory Notes | Apr 2026 | 7% | — | 168 |"
    ]
   },
   {
@@ -315,10 +312,10 @@
    "seniority_class": "parent_secured",
    "borrower": null,
    "recourse_to_parent": true,
-   "security": "pledges of certain assets as collateral",
+   "security": "certain assets",
    "principal": 0.0,
    "post_period_change": null,
-   "commitment": null,
+   "commitment": 2500.0,
    "rate_type": "unknown",
    "fixed_rate_pct": null,
    "spread_pct": null,
@@ -339,7 +336,7 @@
    "seniority_class": "other",
    "borrower": null,
    "recourse_to_parent": true,
-   "security": null,
+   "security": "financed equipment",
    "principal": 4220.0,
    "post_period_change": null,
    "commitment": null,
@@ -354,7 +351,7 @@
    "source": "0001769628-26-000366",
    "quotes": [
     "| OEM and Software License Financing Arrangements | Dec 2026 - Jul 2030 | 11% | 4,220 | 3,518 |",
-    "As of June 30, 2026, the Company's weighted-average interest rate on short-term debt instruments related to certain of the OEM Financing Arrangements was 9%."
+    "The Company granted a security interest for the financed equipment related to these financing arrangements."
    ]
   },
   {
@@ -362,13 +359,13 @@
    "kind": "other",
    "seniority_class": "other",
    "borrower": null,
-   "recourse_to_parent": null,
-   "security": null,
+   "recourse_to_parent": true,
+   "security": "unsecured",
    "principal": 189.0,
    "post_period_change": null,
    "commitment": null,
-   "rate_type": "unknown",
-   "fixed_rate_pct": null,
+   "rate_type": "fixed",
+   "fixed_rate_pct": 12.0,
    "spread_pct": null,
    "benchmark": null,
    "effective_rate_pct": 12.0,
@@ -377,8 +374,7 @@
    "currency": "USD",
    "source": "0001769628-26-000366",
    "quotes": [
-    "| Magnetar Loan | Jan 2029 | 12% | 189 | 273 |",
-    "The remaining obligation as of June 30, 2026 was $189 million, consisting of the unused refundable deposit amount, together with accrued redemption premiums through the reporting date."
+    "| Magnetar Loan | Jan 2029 | 12% | 189 | 273 |"
    ]
   },
   {
@@ -387,14 +383,14 @@
    "seniority_class": "asset_level_secured",
    "borrower": "CoreWeave Compute Acquisition Co. VIII, LLC",
    "recourse_to_parent": false,
-   "security": "equity interests of CCAC VIII and substantially all of its assets",
+   "security": "equity of CCAC VIII and substantially all assets of CCAC VIII",
    "principal": 2837.0,
    "post_period_change": null,
-   "commitment": null,
-   "rate_type": "floating",
+   "commitment": 8500.0,
+   "rate_type": "unknown",
    "fixed_rate_pct": null,
-   "spread_pct": 2.25,
-   "benchmark": "SOFR",
+   "spread_pct": null,
+   "benchmark": null,
    "effective_rate_pct": 7.0,
    "maturity": "2032-03",
    "amortization": "amortizing",
@@ -402,17 +398,16 @@
    "source": "0001769628-26-000366",
    "quotes": [
     "| DDTL 4.0 Facility | Mar 2032 | 7% | 2,837 | — |",
-    "As of June 30, 2026, the facility has $1.4 billion of outstanding floating-rate loan and $1.5 billion of outstanding fixed-rate loan.",
-    "The DDTL 4.0 Facility is non-recourse, except for limited guarantees related to customary non-recourse carve-out obligations."
+    "As of June 30, 2026, the facility has $1.4 billion of outstanding floating-rate loan and $1.5 billion of outstanding fixed-rate loan."
    ]
   },
   {
    "name": "OEM and Software License Financing Arrangements (non-recourse)",
    "kind": "vendor_financing",
    "seniority_class": "asset_level_secured",
-   "borrower": null,
+   "borrower": "certain subsidiaries",
    "recourse_to_parent": false,
-   "security": "assets of the applicable subsidiaries",
+   "security": "financed equipment",
    "principal": 882.0,
    "post_period_change": null,
    "commitment": null,
@@ -426,8 +421,7 @@
    "currency": "USD",
    "source": "0001769628-26-000366",
    "quotes": [
-    "| OEM and Software License Financing Arrangements | Aug 2026 - Aug 2028 | 9% | 882 | 647 |",
-    "Non-recourse debt represents debt facilities and financing arrangements entered into by certain of the Company’s subsidiaries for which recourse is limited to the assets of the applicable subsidiaries."
+    "| OEM and Software License Financing Arrangements | Aug 2026 - Aug 2028 | 9% | 882 | 647 |"
    ]
   },
   {
@@ -436,7 +430,7 @@
    "seniority_class": "asset_level_secured",
    "borrower": "CoreWeave Financing DDTL V-V, LLC",
    "recourse_to_parent": true,
-   "security": "substantially all assets of the Borrower and its subsidiaries and 100% of the equity interests in the Borrower",
+   "security": "substantially all assets of Borrower and subsidiaries; 100% equity of Borrower",
    "principal": 0.0,
    "post_period_change": 0.0,
    "commitment": 2600.0,
@@ -450,9 +444,9 @@
    "currency": "USD",
    "source": "0001769628-26-000357",
    "quotes": [
-    "providing for a $2.6 billion delayed draw term loan facility (the “DDTL 5.5 Facility”)",
-    "for SOFR loans, Term SOFR (subject to a 0.00% floor) plus an applicable margin of 5.50% per annum",
-    "The maturity date of the DDTL 5.5 Facility is September 1, 2031."
+    "providing for a $2.6 billion delayed draw term loan facility (the “DDTL 5.5 Facility”).",
+    "The maturity date of the DDTL 5.5 Facility is September 1, 2031.",
+    "Term SOFR (subject to a 0.00% floor) plus an applicable margin of 5.50% per annum"
    ]
   },
   {
@@ -475,9 +469,9 @@
    "currency": "USD",
    "source": "0001769628-26-000432",
    "quotes": [
-    "completed its previously announced upsized private offering of $4.2 billion aggregate principal amount of its 2.875% Convertible Senior Notes due 2033",
-    "The Notes bear interest at a rate of 2.875% per year, payable semiannually in arrears on April 1 and October 1 of each year",
-    "The Notes will mature on April 1, 2033 (the “maturity date”), unless earlier converted, redeemed or repurchased."
+    "$4.2 billion aggregate principal amount of its 2.875% Convertible Senior Notes due 2033",
+    "The Notes will mature on April 1, 2033",
+    "The Notes are general senior, unsecured obligations of CoreWeave."
    ]
   }
  ]
