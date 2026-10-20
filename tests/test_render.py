@@ -74,3 +74,10 @@ def test_unmodeled_interest_banner():
     d = sample_dashboard()
     d = d.model_copy(update={"model": d.model.model_copy(update={"excluded": ["B (no rate: interest not modeled)"]})})
     assert "Interest not modeled for: B" in render(d)
+
+
+def test_basis_lines_shown_as_info():
+    d = sample_dashboard().model_copy(update={"basis": ["Full-year figures come from the 20-F for fiscal 2025.",
+                                                          "Balances are as of 2026-06-30 from 6-K <x>."]})
+    html = render(d)
+    assert html.count('class="cw-info"') == 2 and "6-K &lt;x&gt;" in html

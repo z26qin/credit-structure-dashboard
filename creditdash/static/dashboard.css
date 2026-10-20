@@ -30,6 +30,7 @@ body { font-family: var(--font-sans); font-size: var(--fs-body); -webkit-font-sm
 .cw-badge.is-warn::before { background: var(--warn); }
 .cw-badge.is-fail::before, .cw-badge.is-skipped::before { background: var(--bad); }
 .cw-banner { margin: 0; padding: var(--gap-sm) var(--gap-md); border-left: 3px solid var(--bad); background: var(--bad-wash); border-radius: 4px; color: var(--fg); font-size: var(--fs-caption); }
+.cw-info { margin: 0; padding: var(--gap-sm) var(--gap-md); border-left: 3px solid var(--c-highlight); background: #eef4fc; border-radius: 4px; color: var(--fg); font-size: var(--fs-caption); line-height: 1.5; }
 .cw-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-sm); }
 .cw-seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .cw-seg button, .cw-chips button { font: inherit; font-size: var(--fs-caption); padding: 4px 10px; background: transparent; color: var(--fg-muted); border: 0; cursor: pointer; }

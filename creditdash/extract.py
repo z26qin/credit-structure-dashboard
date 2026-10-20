@@ -14,8 +14,9 @@ from .errors import LlmError
 from .footnote import debt_note_from_html, debt_note_from_instance, eight_k_items
 from .models import Extraction, Resolved
 
-PROMPT_VERSION = "extract_v4"
+PROMPT_VERSION = "extract_v5"
 PROMPT_FILE = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
+MAX_6K_CHARS = 24_000
 
 
 def build_inputs(resolved: Resolved, instance_xml: str, filing_html: Callable[[], str],
@@ -40,11 +41,12 @@ def build_inputs(resolved: Resolved, instance_xml: str, filing_html: Callable[[]
     if annual_note:
         sources[a.accession] = annual_note
         parts.append(f"## Annual filing {a.form} {a.accession}, period end {a.period_end}\n\n{annual_note}")
-    for f in resolved.debt_8ks:
-        text = eight_k_items(eight_ks.get(f.accession, ""))
+    for f in resolved.debt_8ks:  # 8-Ks as raw HTML (their debt items are cut out); 6-Ks as text already
+        content = eight_ks.get(f.accession, "")
+        text = eight_k_items(content) if f.form == "8-K" else content[:MAX_6K_CHARS]
         if text:
             sources[f.accession] = text
-            parts.append(f"## 8-K {f.accession} filed {f.filed}\n\n{text}")
+            parts.append(f"## {f.form} {f.accession} filed {f.filed}\n\n{text}")
     return "\n\n".join(parts), sources
 
 

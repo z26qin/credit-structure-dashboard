@@ -67,7 +67,7 @@ def test_system_prompt_rules(resolved, instance_xml, eight_ks, settings):
     extract(resolved, instance_xml, no_html, eight_ks, ask=ask, settings=settings)
     system = ask.calls[0]["system"]
     assert "$ millions" in system and "recorded once" in system and "verbatim" in system
-    assert "annual filing" in system and PROMPT_VERSION == "extract_v4"
+    assert "annual filing" in system and PROMPT_VERSION == "extract_v5"
 
 
 ANNUAL = "0001769628-26-000104"
@@ -111,3 +111,14 @@ def test_llm_failure_skips(resolved, instance_xml, eight_ks, settings):
     ask = FakeAsk(error=LlmError("boom"))
     ext, reason, sources = extract(resolved, instance_xml, no_html, eight_ks, ask=ask, settings=settings)
     assert (ext, reason) == (None, "LLM failed: boom") and PERIODIC in sources
+
+
+def test_6k_after_the_period_is_sent_as_text(resolved, instance_xml, settings):
+    from creditdash.models import Filing
+    sixk = Filing(form="6-K", accession="0001104659-26-112824", filed=date(2026, 10, 1), primary_doc="x.htm")
+    r = resolved.model_copy(update={"debt_8ks": [sixk]})
+    ask = FakeAsk()
+    _, _, sources = extract(r, instance_xml, no_html, {sixk.accession: "Nebius issued $1.0 billion aggregate "
+                            "principal amount of notes."}, ask=ask, settings=settings)
+    assert "## 6-K 0001104659-26-112824 filed 2026-10-01" in ask.calls[0]["prompt"]
+    assert sources[sixk.accession].startswith("Nebius issued")

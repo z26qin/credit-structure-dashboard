@@ -314,3 +314,4 @@ class Dashboard(BaseModel):
     market: Market
     model: ModelOutput
     settings: dict
+    basis: list[str] = []  # where each part of the figures comes from, when that needs saying (20-F filers)

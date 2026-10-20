@@ -41,7 +41,8 @@ def _cells(row) -> list[str]:
 
 
 def _squash(text: str) -> str:
-    return re.sub(r"\s+", " ", text.replace("\xa0", " ")).strip()
+    text = text.replace("\xa0", " ").replace("\u200b", "").replace("\ufeff", "")  # zero-width spacer cells
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def html_to_text(html: str) -> str:

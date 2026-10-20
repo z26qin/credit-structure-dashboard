@@ -15,6 +15,7 @@
       <span class="cw-badge is-{{ d.reconciliation.status.value }}" id="recon-badge">Reconciliation: {{ d.reconciliation.status.value }}</span>
       <span class="cw-note" id="recon-detail"></span>
     </div>
+    {% for line in d.basis %}<p class="cw-info">{{ line }}</p>{% endfor %}
     {% if d.extraction_skipped %}<p class="cw-banner">instrument detail unavailable: {{ d.extraction_skipped }}</p>{% endif %}
     {% if no_rate %}<p class="cw-banner">Interest not modeled for: {{ no_rate | join(", ") }} (no coupon, spread or SOFR available); coverage is overstated.</p>{% endif %}
     {% if matured %}<p class="cw-banner">Matured before the period end and left out: {{ matured | join(", ") }} (the instrument list is from an older filing).</p>{% endif %}

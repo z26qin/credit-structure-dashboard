@@ -1,6 +1,6 @@
 # creditdash
 
-Ticker in, credit-structure dashboard out. For a company that files 10-Ks and 10-Qs with the SEC,
+Ticker in, credit-structure dashboard out. For a company that files 10-Ks and 10-Qs (or a 20-F in US GAAP) with the SEC,
 `creditdash` reads its latest filings and builds one offline HTML page for a credit investor: who the
 company owes, in what order, when it comes due, and whether cash flow covers it. The layout follows the
 CRWV dashboard in `reference/crwv-artifact/`.
@@ -45,13 +45,26 @@ ticker → resolve → fetch → facts → extract → reconcile → market → 
 - **facts**: XBRL totals (debt, cash, leases, backlog), the maturity schedule (the 10-K's when the 10-Q has
   none), and eight quarters of revenue, EBITDA (operating income + D&A), interest, cash flow and capex.
 - **extract**: the only model call. Code finds the debt note (the 10-Q's and the 10-K's) and the 8-K items;
-  DeepSeek returns a typed instrument list with verbatim quotes. Prompt: `creditdash/prompts/extract_v4.md`.
+  DeepSeek returns a typed instrument list with verbatim quotes. Prompt: `creditdash/prompts/extract_v5.md`.
 - **reconcile**: every quote must appear in the filing text sent; instruments must add up to the reported
   debt (≤1% pass, ≤5% warn, else fail). The gap is drawn as "Unallocated", never filled in.
 - **model**: monthly debt service per instrument, fitted to the reported maturity schedule; EBITDA
   scenarios (consensus if given, TTM, run-rate, stress −30%); coverage, cash to raise, capital stack with
   attachment points, and the cash waterfall.
 - **render**: one template, data and d3 inlined. Every number names its source in "Sources and method".
+
+## 20-F filers (e.g. NBIS)
+
+A foreign private issuer files a 20-F once a year and furnishes quarterly results on 6-K, without XBRL.
+creditdash takes the 20-F's full year from XBRL, then looks through the 6-Ks filed after it for an exhibit
+with interim financial statements. If it finds one, the model reads the three statements and the debt note
+(prompt `creditdash/prompts/interim_v2.md`); every figure must sit in a row of the 6-K text that shows the
+number, or it is dropped. The dashboard is then dated at the interim period end: balances and total debt
+(principal per the debt note) from the 6-K, last-twelve-month figures as full year + year to date − the
+prior year to date, and the debt list read from the 6-K's debt note with the 20-F for detail. Later 6-Ks
+that mention debt (offerings, indentures, credit agreements) are read as post-period changes. The banner at
+the top of the page says which figures come from which filing. With `--no-llm`, or without such a 6-K,
+the figures stay as of the 20-F.
 
 ## Cost and speed
 
@@ -71,7 +84,8 @@ Q2 2026 filings and an accepted extraction, checked as a golden test.
 
 ## Limits
 
-- US filers of 10-K/10-Q only (no 20-F/40-F).
+- 10-K/10-Q filers, and 20-F filers that report in US GAAP. 40-F filers and IFRS 20-F filers are refused
+  with an explanation.
 - Free data only: SOFR from the NY Fed, share price from Yahoo's unofficial endpoint. Consensus, bond
   yields and ratings come from `overrides/`.
 - Quarterly filings often list debt only in categories; the 10-K fills in instrument detail, so balances

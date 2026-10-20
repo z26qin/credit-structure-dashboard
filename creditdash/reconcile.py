@@ -17,7 +17,7 @@ PASS_PCT, WARN_PCT = 0.01, 0.05
 SCALE_TOLERANCE = 0.10
 MONEY_FIELDS = ("principal", "post_period_change", "commitment")
 QUOTE_CHARS = str.maketrans({"“": '"', "”": '"', "„": '"', "‘": "'", "’": "'", "–": "-", "—": "-", "‐": "-",
-                             "−": "-", "\xa0": " "})
+                             "−": "-", "\xa0": " ", "\u200b": "", "\ufeff": ""})
 
 
 def normalize(text: str) -> str:
