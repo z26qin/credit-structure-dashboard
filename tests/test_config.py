@@ -26,4 +26,4 @@ def test_defaults(monkeypatch):
 
 
 def test_model_settings_file():
-    assert load_model_settings() == ModelSettings(stress_haircut=0.30, horizon_years=10, ipf_max_rounds=50)
+    assert load_model_settings() == ModelSettings(stress_haircut=0.30, horizon_years=10, ipf_max_rounds=50, recovery_rate=0.40)

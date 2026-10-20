@@ -82,3 +82,12 @@ body { font-family: var(--font-sans); font-size: var(--fs-body); -webkit-font-sm
 .cw-method a { color: inherit; }
 .cw-hit { cursor: pointer; }
 @media (max-width: 520px) { .cw-hide-narrow { display: none; } :root { --fs-title: 22px; } }
+.cw-risk { background: #fffaf0; border: 1px solid #f3d9a4; border-left: 4px solid var(--warn); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: var(--gap-sm); }
+.cw-risk.is-overreaction { border-left-color: var(--ok); background: #f3faf3; border-color: #cfe8cf; }
+.cw-risk.is-underpricing { border-left-color: var(--bad); background: var(--bad-wash); border-color: #f1c8c6; }
+.cw-risk-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--gap-sm); }
+.cw-risk h2 { margin: 0; font-size: var(--fs-heading); font-weight: 600; }
+.cw-verdict { font-weight: 600; font-size: var(--fs-body); }
+.cw-risk-nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr)); gap: var(--gap-md); }
+.cw-risk-nums > div { display: flex; flex-direction: column; gap: 2px; }
+.cw-risk-text { margin: 0; font-size: var(--fs-body); line-height: 1.55; }

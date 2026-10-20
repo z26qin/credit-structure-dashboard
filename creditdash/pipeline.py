@@ -14,6 +14,7 @@ from .config import ModelSettings, Settings, load_model_settings
 from .edgar import Edgar, archive_url, companyfacts_url, instance_doc
 from .errors import SecError, UnsupportedFiler
 from .extract import PROMPT_VERSION, extract
+from .creditrisk import risk_view
 from .facts import build_financials, fiscal_year_of
 from .interim import debt_filings, extract_interim, find_interim, verify
 from .market import fetch_market
@@ -88,12 +89,15 @@ def build(ticker: str, *, settings: Settings, refresh: bool = False, no_llm: boo
     model_settings = model_settings or load_model_settings()
     model = run_model(instruments, financials, market, model_settings)
     reconciliation.fit_error = model.fit_error
+    risk = risk_view(financials, model, market, model_settings.recovery_rate, use_llm=not no_llm, ask=ask,
+                     settings=settings, use_cache=not refresh)
 
     progress("render")
     dashboard = Dashboard(
         company=company, filing=inputs.periodic, built_at=datetime.now().replace(microsecond=0),
         financials=financials, extraction=extraction, extraction_skipped=skipped, instruments=instruments,
         reconciliation=reconciliation, market=market, model=model, basis=inputs.basis,
+        risk=risk.model_dump(mode="json"),
         settings=model_settings.model_dump() | {"llm_model": None if no_llm else settings.llm_model,
                                                 "prompt_version": None if no_llm else PROMPT_VERSION} | inputs.settings,
     )

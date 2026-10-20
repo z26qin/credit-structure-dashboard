@@ -26,6 +26,26 @@
     <p class="cw-note">Debt per the {{ d.filing.form }} filed {{ d.filing.filed }} ({{ d.filing.accession }}){% if d.extraction and d.extraction.instruments | selectattr("post_period_change") | list %}, pro forma for changes after the period end{% endif %}. Money in US dollars; built {{ d.built_at.strftime("%Y-%m-%d %H:%M") }}.</p>
   </header>
 
+  {% set r = d.risk %}
+  <section class="cw-risk{% if r and r.assessment %} is-{{ r.assessment.verdict }}{% endif %}" id="risk" aria-label="Market-implied default risk">
+    <div class="cw-risk-head">
+      <h2>Market-implied default risk vs cash flow</h2>
+      {% if r and r.assessment %}<span class="cw-verdict">{{ {"overreaction": "Looks like an overreaction", "fair": "Price roughly fits the cash flow", "underpricing": "Market may be underpricing risk", "unclear": "Unclear"}[r.assessment.verdict] }}</span>{% endif %}
+    </div>
+    {% if r and r.implied %}
+    <div class="cw-risk-nums">
+      <div><span class="cw-kpi-label">Implied default, 1 year</span><span class="cw-kpi-value">{{ "%.1f"|format(r.implied.pd_1y * 100) }}%</span></div>
+      <div><span class="cw-kpi-label">Implied default, 5 years</span><span class="cw-kpi-value">{{ "%.1f"|format(r.implied.pd_5y * 100) }}%</span></div>
+      <div><span class="cw-kpi-label">Spread</span><span class="cw-kpi-value">{{ "%.0f"|format(r.implied.spread_bps) }} bp</span><span class="cw-kpi-sub">{{ r.implied.basis }} · recovery {{ "%.0f"|format(r.implied.recovery * 100) }}%</span></div>
+      {% set e = r.metrics.ebitda_to_next12m_interest %}{% set c = r.metrics.cfo_plus_interest_to_interest %}
+      <div><span class="cw-kpi-label">EBITDA ÷ next-12m interest</span><span class="cw-kpi-value">{{ "%.1fx"|format(e) if e is not none else "—" }}</span><span class="cw-kpi-sub">operating cash flow covers interest {{ "%.1fx"|format(c) if c is not none else "—" }}</span></div>
+    </div>
+    {% endif %}
+    {% if r and r.assessment %}<p class="cw-risk-text">{{ r.assessment.summary }}</p>
+    <p class="cw-note">Read by the model from the figures above and the coverage numbers on this page only (cited: {{ r.assessment.cited | join(", ") }}). Implied probability assumes a flat hazard rate; a single bond's yield can also reflect convertible terms or thin trading.</p>{% endif %}
+    {% if r and r.note %}<p class="cw-note">{{ r.note }}</p>{% endif %}
+  </section>
+
   <section class="cw-kpis" id="kpis" aria-label="Headline figures"></section>
 
   <h2 class="cw-h2">Capital structure</h2>

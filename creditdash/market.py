@@ -51,6 +51,8 @@ def fetch_market(ticker: str, shares: Fact, overrides_dir: Path, transport: http
     return Market(sofr_pct=sofr, price=price, market_cap=cap, consensus=sorted(consensus, key=lambda c: c.fiscal_year),
                   ratings={str(k): str(v) for k, v in (o.get("ratings") or {}).items()},
                   bond_yields={str(k): float(v) for k, v in (o.get("bond_yields") or {}).items()},
+                  cds_bps=Fact(value=float(o["cds_5y_bps"]), tag="override", note=f"overrides/{ticker}.yaml")
+                  if o.get("cds_5y_bps") is not None else Fact(value=None),
                   **({"ebitda_label": str(o["ebitda_label"])} if o.get("ebitda_label") else {}))
 
 

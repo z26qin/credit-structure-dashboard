@@ -1,0 +1,3 @@
+# From reference/crwv-artifact/data/market.json: unsecured notes yield-to-worst range 13.5–14.6% (BondTerminal, 2026-10-19).
+bond_yields:
+  Unsecured notes, worst (BondTerminal 2026-10-19): 14.6

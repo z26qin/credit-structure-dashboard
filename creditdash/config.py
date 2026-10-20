@@ -58,6 +58,7 @@ class ModelSettings(BaseModel):
     stress_haircut: float = 0.30
     horizon_years: int = 10
     ipf_max_rounds: int = 50
+    recovery_rate: float = 0.40
 
 
 def load_model_settings(path: Path = MODEL_SETTINGS_FILE) -> ModelSettings:

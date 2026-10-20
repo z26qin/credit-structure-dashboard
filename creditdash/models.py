@@ -232,6 +232,7 @@ class Market(BaseModel):
     consensus: list[ConsensusYear] = []
     ratings: dict[str, str] = {}
     bond_yields: dict[str, float] = {}
+    cds_bps: Fact = Fact(value=None)  # 5-year CDS from overrides
     ebitda_label: str = "EBITDA (operating income + D&A)"
 
 
@@ -314,4 +315,5 @@ class Dashboard(BaseModel):
     market: Market
     model: ModelOutput
     settings: dict
+    risk: dict | None = None  # creditrisk.RiskView as data
     basis: list[str] = []  # where each part of the figures comes from, when that needs saying (20-F filers)
