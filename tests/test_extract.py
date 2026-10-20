@@ -67,7 +67,31 @@ def test_system_prompt_rules(resolved, instance_xml, eight_ks, settings):
     extract(resolved, instance_xml, no_html, eight_ks, ask=ask, settings=settings)
     system = ask.calls[0]["system"]
     assert "$ millions" in system and "recorded once" in system and "verbatim" in system
-    assert PROMPT_VERSION == "extract_v1"
+    assert "annual filing" in system and PROMPT_VERSION == "extract_v2"
+
+
+ANNUAL = "0001769628-26-000104"
+
+
+def test_annual_note_added_for_detail(resolved, instance_xml, eight_ks, settings):
+    ask = FakeAsk()
+    annual = (FIXTURES / "instance-10k.xml").read_text()
+    _, _, sources = extract(resolved, instance_xml, no_html, eight_ks, annual_instance=annual, ask=ask,
+                            settings=settings)
+    prompt = ask.calls[0]["prompt"]
+    periodic_at, annual_at = prompt.index(f"## Periodic filing 10-Q {PERIODIC}"), prompt.index(
+        f"## Annual filing 10-K {ANNUAL}, period end 2025-12-31")
+    assert periodic_at < annual_at < prompt.index(f"## 8-K {K1}")
+    assert set(sources) == {PERIODIC, ANNUAL, K1, K2} and "DDTL 3.0 Facility" in sources[ANNUAL]
+
+
+def test_annual_note_alone_when_the_10q_has_none(resolved, eight_ks, settings):
+    ask = FakeAsk()
+    annual = (FIXTURES / "instance-10k.xml").read_text()
+    ext, reason, sources = extract(resolved, "<xbrl/>", lambda: "<p>nothing</p>", eight_ks, annual_instance=annual,
+                                   ask=ask, settings=settings)
+    assert ext == CANNED and reason is None and PERIODIC not in sources
+    assert "has no debt note" in ask.calls[0]["prompt"]
 
 
 def test_no_footnote_skips(resolved, eight_ks, settings):

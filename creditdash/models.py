@@ -30,6 +30,7 @@ class Resolved(BaseModel):
     company: Company
     periodic: Filing
     debt_8ks: list[Filing]
+    annual: Filing | None = None  # latest 10-K when the periodic filing is a 10-Q
 
 
 # --- reported numbers ------------------------------------------------------------------------

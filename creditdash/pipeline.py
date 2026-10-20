@@ -43,6 +43,15 @@ def build(ticker: str, *, settings: Settings, refresh: bool = False, no_llm: boo
                               cache / "instance.xml", max_age)
     except SecError:  # older filings without inline XBRL: fall back to the HTML document
         instance = ""
+    annual_instance = None
+    if resolved.annual is not None:  # the 10-K, for the maturity schedule and instrument detail a 10-Q may lack
+        a = resolved.annual
+        try:
+            annual_instance = edgar.text(archive_url(company.cik, a.accession, instance_doc(a.primary_doc)),
+                                         settings.home / "cache" / str(company.cik) / a.accession / "instance.xml",
+                                         max_age)
+        except SecError:
+            annual_instance = None
     eight_ks = {f.accession: edgar.text(archive_url(company.cik, f.accession, f.primary_doc),
                                         cache / f"8k-{f.accession}.htm", max_age) for f in resolved.debt_8ks}
     filing_html = partial(edgar.text, archive_url(company.cik, filing.accession, filing.primary_doc),
@@ -50,13 +59,14 @@ def build(ticker: str, *, settings: Settings, refresh: bool = False, no_llm: boo
 
     progress("facts")
     financials = build_financials(companyfacts, instance, filing.period_end, company.fiscal_year_end,
-                                  filing.accession)
+                                  filing.accession, annual_end=resolved.annual.period_end if resolved.annual else None)
 
     progress("extract")
     if no_llm:
         extraction, skipped, sources = None, "--no-llm", {}
     else:
         extraction, skipped, sources = extract(resolved, instance, filing_html, eight_ks,
+                                               annual_instance=annual_instance,
                                                ask=partial(llm.ask, transport=llm_transport), settings=settings,
                                                use_cache=not refresh)
 

@@ -45,6 +45,16 @@ def test_resolves_crwv(edgar):
     assert r.debt_8ks[0].items == ["1.01", "2.03", "7.01", "9.01"]
 
 
+def test_latest_10k_alongside_a_10q(edgar):
+    r = resolve("CRWV", edgar)
+    assert (r.annual.form, r.annual.accession, r.annual.period_end, r.annual.primary_doc) == \
+        ("10-K", "0001769628-26-000104", date(2025, 12, 31), "crwv-20251231.htm")
+
+
+def test_no_annual_when_the_periodic_is_a_10k(edgar_with_brk):
+    assert resolve("BRK-B", edgar_with_brk).annual is None
+
+
 def test_unknown_ticker(edgar):
     with pytest.raises(UnknownTicker, match="ZZZZZ"):
         resolve("ZZZZZ", edgar)

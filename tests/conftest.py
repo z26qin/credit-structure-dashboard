@@ -15,6 +15,7 @@ SEC_FILES = {
     "https://data.sec.gov/submissions/CIK0001769628.json": "submissions.json",
     "https://data.sec.gov/api/xbrl/companyfacts/CIK0001769628.json": "companyfacts.json",
     f"{ARCHIVE}/000176962826000366/crwv-20260630_htm.xml": "instance.xml",
+    f"{ARCHIVE}/000176962826000104/crwv-20251231_htm.xml": "instance-10k.xml",
     f"{ARCHIVE}/000176962826000357/crwv-20260807.htm": "8k-20260807.htm",
     f"{ARCHIVE}/000176962826000432/crwv-20260917.htm": "8k-20260917.htm",
 }

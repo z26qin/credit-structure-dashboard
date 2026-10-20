@@ -250,6 +250,10 @@
 
     body.append(el("h4", {}, "Model"));
     const ml = el("ul");
+    if (f.maturities_as_of && f.maturities_as_of !== f.period_end) {
+      ml.append(el("li", {}, "This filing has no maturity schedule; the schedule is the 10-K's as of " + f.maturities_as_of +
+        ", with years already past dropped and the current year's amount placed in the remaining months."));
+    }
     ml.append(el("li", {}, "Bullets repay at maturity; amortizing loans are fitted to the reported maturity schedule" +
       (isNum(D.model.fit_error) ? " (largest bucket error " + money(D.model.fit_error, 2) + ")" : "") +
       "; post-period draws are scheduled on top. Interest is charged monthly on the opening balance; floating rates use SOFR " +

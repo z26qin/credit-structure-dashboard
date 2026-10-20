@@ -14,19 +14,32 @@ from .errors import LlmError
 from .footnote import debt_note_from_html, debt_note_from_instance, eight_k_items
 from .models import Extraction, Resolved
 
-PROMPT_VERSION = "extract_v1"
+PROMPT_VERSION = "extract_v2"
 PROMPT_FILE = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 
 
 def build_inputs(resolved: Resolved, instance_xml: str, filing_html: Callable[[], str],
-                 eight_ks: dict[str, str]) -> tuple[str | None, dict[str, str]]:
-    """(user prompt, or None when no debt footnote is found; accession -> source text for quote checks)."""
+                 eight_ks: dict[str, str], annual_instance: str | None = None) -> tuple[str | None, dict[str, str]]:
+    """(user prompt, or None when no debt footnote is found; accession -> source text for quote checks).
+
+    Quarterly filings often list debt only in category totals, or not at all, leaving the instruments to
+    the 10-K; the latest 10-K's debt note is then added for detail."""
     note = debt_note_from_instance(instance_xml) or debt_note_from_html(filing_html())
-    if not note:
+    a = resolved.annual
+    annual_note = debt_note_from_instance(annual_instance) if a and annual_instance else None
+    if not note and not annual_note:
         return None, {}
     p = resolved.periodic
-    sources = {p.accession: note}
-    parts = [f"## Periodic filing {p.form} {p.accession}, period end {p.period_end}\n\n{note}"]
+    sources: dict[str, str] = {}
+    head = f"## Periodic filing {p.form} {p.accession}, period end {p.period_end}"
+    if note:
+        sources[p.accession] = note
+        parts = [f"{head}\n\n{note}"]
+    else:
+        parts = [f"{head}\n\nThis filing has no debt note; use the annual filing."]
+    if annual_note:
+        sources[a.accession] = annual_note
+        parts.append(f"## Annual filing {a.form} {a.accession}, period end {a.period_end}\n\n{annual_note}")
     for f in resolved.debt_8ks:
         text = eight_k_items(eight_ks.get(f.accession, ""))
         if text:
@@ -36,9 +49,9 @@ def build_inputs(resolved: Resolved, instance_xml: str, filing_html: Callable[[]
 
 
 def extract(resolved: Resolved, instance_xml: str, filing_html: Callable[[], str], eight_ks: dict[str, str], *,
-            ask: Callable = llm.ask, settings: Settings,
+            annual_instance: str | None = None, ask: Callable = llm.ask, settings: Settings,
             use_cache: bool = True) -> tuple[Extraction | None, str | None, dict[str, str]]:
-    prompt, sources = build_inputs(resolved, instance_xml, filing_html, eight_ks)
+    prompt, sources = build_inputs(resolved, instance_xml, filing_html, eight_ks, annual_instance)
     if prompt is None:
         return None, "debt footnote not found", sources
     try:

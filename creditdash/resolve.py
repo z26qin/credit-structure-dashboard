@@ -32,9 +32,13 @@ def resolve(ticker: str, edgar: Edgar) -> Resolved:
 
     debt_8ks = sorted((f for f in filings if f.form == "8-K" and f.filed > newest.period_end
                        and any(i in f.items for i in DEBT_ITEMS)), key=lambda f: f.filed)
+    annual = None
+    if newest.form == "10-Q":
+        annual = max((f for f in filings if f.form == "10-K" and f.filed <= newest.filed), key=lambda f: f.filed,
+                     default=None)
     company = Company(ticker=symbol, cik=cik, name=subs.get("name") or row["title"],
                       fiscal_year_end=subs.get("fiscalYearEnd") or "1231")
-    return Resolved(company=company, periodic=newest, debt_8ks=debt_8ks)
+    return Resolved(company=company, periodic=newest, debt_8ks=debt_8ks, annual=annual)
 
 
 def _filings(recent: dict) -> list[Filing]:
