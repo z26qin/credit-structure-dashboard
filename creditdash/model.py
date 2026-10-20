@@ -24,6 +24,8 @@ from .models import (
 from .reconcile import maturity_date
 
 BEYOND = "__beyond__"  # principal due after the last modeled period
+UNALLOCATED_SOURCE = "reconcile"  # the reported debt no extracted instrument accounts for
+GAP_THEREAFTER_YEARS = 5  # its "Thereafter" share is spread over the 5 years after the last dated bucket
 
 
 @dataclass
@@ -83,7 +85,10 @@ def run_model(instruments: list[Instrument], financials: Financials, market: Mar
               settings: ModelSettings) -> ModelOutput:
     excluded: list[str] = []
     loans: list[_Loan] = []
+    gaps = [i for i in instruments if i.source == UNALLOCATED_SOURCE]
     for i in instruments:
+        if i.source == UNALLOCATED_SOURCE:
+            continue
         mat = maturity_date(i.maturity)
         balance = (i.principal or 0) + (i.post_period_change or 0)
         if mat is None or (i.principal is None and i.post_period_change is None) or balance <= 0:
@@ -96,10 +101,23 @@ def run_model(instruments: list[Instrument], financials: Financials, market: Mar
                            maturity=max(mat, financials.period_end + timedelta(days=1)), rate=rate or 0.0,
                            flexible=i.amortization != "bullet"))
 
-    periods = build_periods(financials, max((l.maturity for l in loans), default=None), settings.horizon_years)
+    gap_total = sum(i.principal or 0 for i in gaps)
+    dated = [b.fiscal_year for b in financials.maturities if b.fiscal_year is not None]
+    gap_maturity = (fiscal_year_end_date(max(dated) + GAP_THEREAFTER_YEARS, financials.fiscal_year_end)
+                    if gap_total > 0 and dated else None)
+    last = max([l.maturity for l in loans] + ([gap_maturity] if gap_maturity else []), default=None)
+    periods = build_periods(financials, last, settings.horizon_years)
     months = _month_list(periods)
     label_of = _period_of(periods)
     fit_error = _fit(loans, financials, periods, months, label_of, settings.ipf_max_rounds)
+    if gap_total > 0:
+        rate = _gap_rate(loans, financials)
+        if gap_maturity is None or rate is None:
+            excluded.append(gaps[0].name + (" (no reported maturity schedule)" if gap_maturity is None else " (no rate)"))
+        else:
+            gap = _Loan(inst=gaps[0], principal=gap_total, post=0.0, maturity=gap_maturity, rate=rate, flexible=True)
+            gap.alloc = _gap_alloc(loans, financials, periods, gap_total, max(dated))
+            loans.append(gap)
     service = _simulate(loans, months, label_of)
 
     scenarios = _scenarios(financials, market, periods, settings)
@@ -189,6 +207,34 @@ def _buckets(financials: Financials, periods: list[Period]) -> list[tuple[set[st
              and p.fiscal_year > max((b.fiscal_year for b in dated), default=0)} | {BEYOND}
     out += [(after, b.principal) for b in financials.maturities if b.fiscal_year is None]
     return out
+
+
+def _gap_rate(loans: list[_Loan], financials: Financials) -> float | None:
+    """Balance-weighted rate of the known instruments, else TTM interest ÷ reported debt."""
+    priced = [l for l in loans if l.rate > 0 and l.principal > 0]
+    if priced:
+        return sum(l.rate * l.principal for l in priced) / sum(l.principal for l in priced)
+    interest, debt = financials.ttm.interest_expense, financials.total_debt.value
+    return interest / debt * 100 if interest and debt else None
+
+
+def _gap_alloc(loans: list[_Loan], financials: Financials, periods: list[Period], amount: float,
+               last_dated_fy: int) -> dict[str, float]:
+    """The unallocated debt takes whatever the reported schedule has left after the known instruments."""
+    alloc: dict[str, float] = {}
+    for labels, reported in _buckets(financials, periods):
+        residual = max(reported - sum(v for l in loans for k, v in l.alloc.items() if k in labels), 0.0)
+        if BEYOND in labels:  # Thereafter: spread evenly over the following years
+            spread = [p.label for p in periods if last_dated_fy < p.fiscal_year <= last_dated_fy + GAP_THEREAFTER_YEARS]
+            for label in spread:
+                alloc[label] = alloc.get(label, 0.0) + residual / len(spread)
+        else:
+            for label in labels:
+                alloc[label] = alloc.get(label, 0.0) + residual
+    total = sum(alloc.values())
+    if total <= 0:
+        return {periods[-1].label: amount}
+    return {k: v * amount / total for k, v in alloc.items()}
 
 
 def _simulate(loans: list[_Loan], months, label_of) -> list[ServiceRow]:

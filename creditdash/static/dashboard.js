@@ -256,6 +256,10 @@
       pct(sofr, 2) + " held flat."));
     ml.append(el("li", {}, "Scenarios: consensus when given in overrides (current year less reported quarters); TTM held flat; run-rate = latest quarter × 4; stress = consensus or TTM less " +
       Math.round((D.settings.stress_haircut || 0) * 100) + "% after the first period."));
+    const gap = D.instruments.filter((i) => i.source === "reconcile").reduce((s, i) => s + balance(i), 0);
+    if (gap > 0) ml.append(el("li", {}, money(gap) + " of reported debt is not matched to an instrument (Unallocated). It takes " +
+      "whatever the reported maturity schedule leaves after the known instruments, with its Thereafter share spread over the " +
+      "five years after the last dated year, at the known instruments' average rate (or TTM interest ÷ debt)."));
     if (D.model.excluded.length) ml.append(el("li", {}, "Not in the schedule (no maturity, balance or rate): " + D.model.excluded.join(", ") + "."));
     body.append(ml);
   }

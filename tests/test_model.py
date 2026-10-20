@@ -3,6 +3,7 @@ from pytest import approx
 
 from creditdash.model import run_model
 from creditdash.models import ConsensusYear, SeniorityClass
+from creditdash.reconcile import unallocated
 from tests.toy import FIN, MKT, SETTINGS, TOY, financials, inst, market
 
 
@@ -103,6 +104,26 @@ def test_dscr_and_raise(out):
     r = {x.period: x for x in out.raise_rows}
     assert r["2027"].to_raise == approx(max(0, 200 + 400 - 240))
     assert all(x.to_raise >= 0 for x in out.raise_rows)
+
+
+def test_unallocated_follows_reported_schedule():
+    # Totals-only build (no extraction): the whole debt follows the reported schedule; Thereafter is spread
+    # evenly over the five years after the last dated bucket (2029–2033); interest at TTM interest ÷ debt (2%).
+    out = run_model([unallocated(1000.0)], FIN, MKT, SETTINGS)
+    p = principal_by(out)
+    assert [p[("Unallocated", k)] for k in ("2H26", "2027", "2028")] == approx([100, 400, 200])
+    assert [p[("Unallocated", str(y))] for y in range(2029, 2034)] == approx([60] * 5)
+    assert "Unallocated" not in out.excluded
+    assert interest_by(out)[("Unallocated", "2H26")] == approx(1000 * 0.02 / 2 - 0.02 / 12 * 100 / 6 * 15, abs=0.01)
+    assert {c.period for c in out.coverage} >= {"2027", "2033"}
+
+
+def test_unallocated_takes_only_the_residual():
+    out = run_model(TOY[:2] + [unallocated(300.0)], FIN, MKT, SETTINGS)
+    p = principal_by(out)
+    assert sum(v for (n, _), v in p.items() if n == "Unallocated") == approx(300)
+    assert p.get(("Unallocated", "2027"), 0) == approx(0, abs=1e-6)
+    assert p[("B", "2027")] == approx(100, abs=0.01)
 
 
 def test_waterfall_shortfall():  # TTM EBITDA 150: B due 115.25 is paid, A due 307.5 is short
