@@ -53,6 +53,16 @@ def test_skipped_banner():
     assert "instrument detail unavailable: --no-llm" in html
 
 
+CHARTS = ["drawStack", "drawYield", "drawPaying", "drawWall", "drawCoverage", "drawRaise", "drawWaterfall"]
+
+
+def test_chart_hooks():
+    html = render(sample_dashboard())
+    for fn in CHARTS:
+        assert f"function {fn}(" in html, fn
+        assert f"{fn}()" in html, fn
+
+
 def test_write_outputs(tmp_path):
     path = write_outputs(sample_dashboard(), tmp_path)
     assert path == tmp_path / "CRWV" / "2026-06-30" / "index.html"
