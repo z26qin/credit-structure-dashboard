@@ -1,0 +1,14 @@
+{
+  "description": "Modeled by Claude: interest and scheduled principal per instrument and year, 2H26 to 2033. Amortizing loans are spread over their lives and scaled so totals match the 10-Q principal schedule; notes, converts and the revolver are bullets; interest is cash coupon on monthly balances with SOFR held at 3.87%.",
+  "fixed": true,
+  "source": {
+    "kind": "file",
+    "name": "crwv_debt_service_model.json",
+    "url": "/_blob/412a2b572f207bbca4d4056acd3e49f3"
+  },
+  "title": "Sample: modeled debt service",
+  "updated": {
+    "at": "2026-10-20T14:39:42Z",
+    "by": "Claude"
+  }
+}

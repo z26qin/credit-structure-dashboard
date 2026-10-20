@@ -1,0 +1,14 @@
+{
+  "description": "Modeled by Claude: consensus EBITDA held flat after 2028; backlog run-off recognizes the $103.7B Jun 30 backlog on its 10-Q timing (41% in 24 months, 39% in months 25–48, the rest by month 78) at a 58% margin; stress loses 30% of that backlog and runs a 50% margin from 2027.",
+  "fixed": true,
+  "source": {
+    "kind": "file",
+    "name": "crwv_scenarios_model.json",
+    "url": "/_blob/955e88a4e9fb078769ede6fc739ced07"
+  },
+  "title": "Sample: EBITDA scenarios",
+  "updated": {
+    "at": "2026-10-20T14:11:19Z",
+    "by": "Claude"
+  }
+}

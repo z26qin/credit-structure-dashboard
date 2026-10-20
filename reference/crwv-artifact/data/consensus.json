@@ -1,0 +1,29 @@
+[
+ {
+  "period": "2H26",
+  "revenue": 8.272,
+  "ebitda": 4.904,
+  "capex": 21.793,
+  "cfo": 3.393,
+  "interest_implied": 2.71,
+  "method": "Sell-side consensus (MarketScreener, Oct 15, 2026); 2H26 is FY26E less H1 actual"
+ },
+ {
+  "period": "2027",
+  "revenue": 26.311,
+  "ebitda": 16.635,
+  "capex": 47.029,
+  "cfo": 14.613,
+  "interest_implied": 6.696,
+  "method": "Sell-side consensus (MarketScreener, Oct 15, 2026); 2H26 is FY26E less H1 actual"
+ },
+ {
+  "period": "2028",
+  "revenue": 42.818,
+  "ebitda": 28.681,
+  "capex": 51.536,
+  "cfo": 29.824,
+  "interest_implied": 9.578,
+  "method": "Sell-side consensus (MarketScreener, Oct 15, 2026); 2H26 is FY26E less H1 actual"
+ }
+]

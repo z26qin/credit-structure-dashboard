@@ -1,0 +1,14 @@
+{
+  "description": "Sell-side consensus revenue, EBITDA, capex and free cash flow from MarketScreener (Oct 15, 2026). 2H26 is FY26E less H1 actual; operating cash flow is capex plus free cash flow; implied interest is EBIT less net income.",
+  "fixed": true,
+  "source": {
+    "kind": "file",
+    "name": "crwv_consensus.json",
+    "url": "/_blob/3681189a1b89d45b16f6a7b8642d175b"
+  },
+  "title": "Street consensus 2026–28",
+  "updated": {
+    "at": "2026-10-20T14:11:19Z",
+    "by": "Claude"
+  }
+}

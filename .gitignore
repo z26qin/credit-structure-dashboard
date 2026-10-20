@@ -1,0 +1,9 @@
+.env
+.creditdash/
+out/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.superpowers/
+.DS_Store

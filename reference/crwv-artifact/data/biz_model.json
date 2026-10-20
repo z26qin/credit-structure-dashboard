@@ -1,0 +1,121 @@
+[
+ {
+  "key": "gs_capex",
+  "label": "Single-project capex",
+  "value": 6.0,
+  "unit": "$B",
+  "source": "Goldman Sachs single-project model, Oct 19, 2026 (user's chart)"
+ },
+ {
+  "key": "gs_term_years",
+  "label": "Contract term in the model",
+  "value": 5,
+  "unit": "years",
+  "source": "Goldman Sachs single-project model, Oct 19, 2026 (user's chart)"
+ },
+ {
+  "key": "gs_revenue",
+  "label": "Annual revenue",
+  "value": 2.6,
+  "unit": "$B/yr",
+  "source": "Goldman Sachs single-project model, Oct 19, 2026 (user's chart)"
+ },
+ {
+  "key": "gs_opex",
+  "label": "Annual opex",
+  "value": 585,
+  "unit": "$M/yr",
+  "source": "Goldman Sachs single-project model, Oct 19, 2026 (user's chart)"
+ },
+ {
+  "key": "gs_cash_tax",
+  "label": "Annual cash tax",
+  "value": 213,
+  "unit": "$M/yr",
+  "source": "Goldman Sachs single-project model, Oct 19, 2026 (user's chart)"
+ },
+ {
+  "key": "dep_years_base",
+  "label": "GPU useful life, base",
+  "value": 6,
+  "unit": "years",
+  "source": "CoreWeave depreciation policy (user's chart)"
+ },
+ {
+  "key": "dep_years_fast",
+  "label": "GPU useful life, fast obsolescence",
+  "value": 3,
+  "unit": "years",
+  "source": "Illustrative (user's chart)"
+ },
+ {
+  "key": "contract_term_low",
+  "label": "Take-or-pay term, low",
+  "value": 4,
+  "unit": "years",
+  "source": "User's chart"
+ },
+ {
+  "key": "contract_term_high",
+  "label": "Take-or-pay term, high",
+  "value": 5,
+  "unit": "years",
+  "source": "User's chart"
+ },
+ {
+  "key": "cancel_notice_days",
+  "label": "Mutual cancellation notice in most colocation contracts",
+  "value": 90,
+  "unit": "days",
+  "source": "Goldman Sachs note (user's chart)"
+ },
+ {
+  "key": "cost_good_low",
+  "label": "Cost of capital, good case, low",
+  "value": 8,
+  "unit": "%",
+  "source": "Illustrative (user's chart)"
+ },
+ {
+  "key": "cost_good_high",
+  "label": "Cost of capital, good case, high",
+  "value": 9,
+  "unit": "%",
+  "source": "Illustrative (user's chart)"
+ },
+ {
+  "key": "cost_bad_low",
+  "label": "Cost of capital, bad case, low",
+  "value": 15,
+  "unit": "%",
+  "source": "Illustrative (user's chart)"
+ },
+ {
+  "key": "cost_bad_high",
+  "label": "Cost of capital, bad case, high",
+  "value": 16,
+  "unit": "%",
+  "source": "Illustrative (user's chart)"
+ },
+ {
+  "key": "discount_growth",
+  "label": "Discount rate: growth-stock regime",
+  "value": 9,
+  "unit": "%",
+  "source": "Illustrative (user's chart)"
+ },
+ {
+  "key": "discount_hy",
+  "label": "Discount rate: high-yield regime",
+  "value": 16,
+  "unit": "%",
+  "source": "Illustrative (user's chart)"
+ },
+ {
+  "key": "discount_horizon_years",
+  "label": "Years of compute rent discounted",
+  "value": 5,
+  "unit": "years",
+  "source": "User's chart"
+ }
+]

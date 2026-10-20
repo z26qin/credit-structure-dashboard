@@ -1,0 +1,1235 @@
+<style>
+  .cw { font-family: var(--font-anthropic-sans); color: var(--color-fg); display: flex; flex-direction: column; gap: var(--cds-gap-lg); }
+  .cw-head { display: flex; flex-direction: column; gap: var(--cds-gap-sm); }
+  .cw-title { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); line-height: 1.2; margin: 0; }
+  .cw-take { font-size: var(--cds-font-size-body); line-height: 1.5; margin: 0; max-width: 80ch; min-height: 3em; }
+  .cw .cw-take b { font-weight: var(--cds-font-weight-medium); font-variant-numeric: tabular-nums; }
+  .cw-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cds-gap-sm); }
+  .cw-seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); overflow: hidden; }
+  .cw-seg button, .cw-chips button { font: inherit; font-size: var(--cds-font-size-caption); padding: var(--cds-pad-xs) var(--cds-pad-sm); background: transparent; color: var(--color-fg-muted); border: 0; cursor: pointer; }
+  .cw-seg button + button { border-left: 1px solid var(--color-border-line); }
+  .cw-seg button[aria-pressed="true"], .cw-chips button[aria-pressed="true"] { background: var(--color-panel); color: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
+  .cw-chips { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs); }
+  .cw-chips button { border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); font-variant-numeric: tabular-nums; }
+  .cw-note { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.45; }
+  .cw-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr)); gap: var(--cds-gap-md); }
+  .cw-kpi { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-md); display: flex; flex-direction: column; gap: var(--cds-gap-xs); }
+  .cw-kpi-label { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .cw-kpi-value { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); line-height: 1.1; font-variant-numeric: tabular-nums; min-height: 1.1em; }
+  .cw-kpi-sub { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+  .cw-h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: var(--cds-gap-md) 0 calc(-1 * var(--cds-gap-sm)); }
+  .cw-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: var(--cds-gap-md); }
+  .cw-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: flex; flex-direction: column; gap: var(--cds-gap-sm); min-width: 0; }
+  .cw-card h3 { margin: 0; font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
+  .cw-chart { position: relative; width: 100%; }
+  .cw-chart svg { display: block; font-family: var(--font-anthropic-sans); }
+  .cw-chart text { font-variant-numeric: tabular-nums; }
+  .cw-tip { position: absolute; z-index: 3; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); line-height: 1.5; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cw-tip .t-h { color: var(--cds-text-secondary); }
+  .cw-tip .t-r { display: flex; align-items: center; gap: 6px; }
+  .cw-tip .t-r .t-v { margin-left: auto; padding-left: 12px; }
+  .cw-sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex: none; }
+  .cw-line-sw { width: 14px; height: 0; border-top: 2px solid; display: inline-block; flex: none; }
+  .cw-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs) var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .cw-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .cw-failed { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: inherit; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+  .cw-failed::before { content: ""; width: .375rem; height: .375rem; border-radius: 50%; background: var(--color-bad); }
+  .cw-table-wrap { max-height: 30rem; overflow: auto; container-type: inline-size; }
+  .cw-table { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+  .cw-table th { position: sticky; top: 0; z-index: 1; background: var(--color-panel); text-align: left; font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
+  .cw-table td { padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); vertical-align: top; }
+  .cw-table .num { text-align: right; white-space: nowrap; }
+  .cw-table td.cls { white-space: nowrap; }
+  .cw-table td.cls .cw-sw { margin-right: 6px; vertical-align: baseline; }
+  .cw-table tr.cw-first td { border-top: 2px solid var(--color-border-line); }
+  .cw-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .cw-sort::after { content: "↕"; opacity: .35; }
+  .cw-table th[aria-sort="ascending"], .cw-table th[aria-sort="descending"] { color: var(--color-fg); }
+  .cw-table th[aria-sort="ascending"] .cw-sort::after { content: "↑"; opacity: 1; }
+  .cw-table th[aria-sort="descending"] .cw-sort::after { content: "↓"; opacity: 1; }
+  .cw-sort:focus-visible { outline: 2px solid var(--color-fg-muted); outline-offset: 2px; border-radius: 2px; }
+  @container (max-width: 640px) { .cw-hide-narrow { display: none; } }
+  .cw-method p { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.55; }
+  .cw-method b { color: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
+  .cw [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+  .cw [data-dash-source-state=empty] { color: transparent; }
+  .cw-hit { cursor: pointer; }
+  .cw .has-val[data-sfx]::after { content: attr(data-sfx); }
+  .fd-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--cds-gap-xs) var(--cds-gap-sm); }
+  .fd-big { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .fd-rows { display: flex; flex-direction: column; gap: var(--cds-gap-md); }
+  .fd-row, .fd-axis { display: grid; grid-template-columns: 4.6rem 1fr; gap: var(--cds-gap-sm); align-items: start; }
+  .fd-label b { display: block; font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); }
+  .fd-label span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .fd-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .fd-track { position: relative; height: 20px; display: flex; gap: 2px; }
+  .fd-seg { height: 100%; border-radius: 3px; flex: none; }
+  .fd-ref { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 1.5px dashed var(--color-fg-muted); }
+  .fd-axis .fd-reflab { position: relative; height: 1.2em; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .fd-axis .fd-reflab span { position: absolute; white-space: nowrap; transform: translateX(-50%); }
+  .fd-cap { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
+  .fd-cap .cw-sw { margin-right: 2px; }
+  .cw .fd-cap b { font-weight: var(--cds-font-weight-medium); color: var(--color-fg); }
+  .cw .fd-cap b.bm-red { color: var(--color-bad); }
+  .cw-kicker { margin: 0; font-size: var(--cds-font-size-caption); letter-spacing: .08em; text-transform: uppercase; color: var(--color-fg-muted); }
+  /* effective-rate list */
+  #effrate-card { container-type: inline-size; }
+  .er-head, .er-row { display: grid; grid-template-columns: 3.4rem minmax(10rem, 17rem) 1fr; gap: var(--cds-gap-sm); align-items: center; }
+  .er-head { font-size: var(--cds-font-size-caption); letter-spacing: .06em; text-transform: uppercase; color: var(--color-fg-muted); padding: var(--cds-pad-xs) 0; border-bottom: 1px solid var(--color-border-line); }
+  .er-list { display: flex; flex-direction: column; gap: 2px; padding-top: var(--cds-pad-xs); }
+  .er-row { padding: var(--cds-pad-xs) var(--cds-pad-sm); margin: 0 calc(-1 * var(--cds-pad-sm)); border-radius: var(--cds-radius); }
+  .er-rate { text-align: right; font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+  .er-n { display: block; font-size: var(--cds-font-size-body); line-height: 1.3; }
+  .er-sub { display: block; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .er-barwrap { display: flex; align-items: center; gap: var(--cds-gap-sm); min-width: 0; }
+  .er-bar { height: 12px; border-radius: 3px; background: var(--cds-chart-muted); flex: none; }
+  .er-val { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .er-tag { margin-left: auto; font-size: var(--cds-font-size-caption); letter-spacing: .06em; text-transform: uppercase; color: var(--color-bad); white-space: nowrap; }
+  .er-row.is-hot { background: color-mix(in srgb, var(--cds-chart-status-critical) 11%, transparent); }
+  .er-row.is-hot .er-rate, .er-row.is-hot .er-n, .er-row.is-hot .er-val { color: var(--color-bad); }
+  .er-row.is-hot .er-bar { background: var(--cds-chart-status-critical); }
+  .er-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: var(--cds-gap-md); margin-top: var(--cds-gap-sm); }
+  .er-kpis > div { border-top: 1px solid var(--color-border-line); padding-top: var(--cds-pad-sm); display: flex; flex-direction: column; gap: 2px; }
+  .er-kv { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); line-height: 1.15; font-variant-numeric: tabular-nums; min-height: 1.15em; }
+  @container (max-width: 560px) {
+    .er-head, .er-row { grid-template-columns: 2.8rem 1fr; }
+    .er-head span:last-child { display: none; }
+    .er-barwrap { grid-column: 2; }
+    .er-tag { display: none; }
+  }
+  /* business model */
+  .bm { container-type: inline-size; gap: var(--cds-gap-md); }
+  .bm-lede { margin: 0; font-size: var(--cds-font-size-body); line-height: 1.6; }
+  .cw .bm b { font-weight: var(--cds-font-weight-medium); }
+  .bm-h { margin: var(--cds-gap-sm) 0 0; font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); display: flex; align-items: center; gap: 8px; }
+  .bm-h::before { content: ""; width: 16px; height: 3px; border-radius: 2px; background: var(--cds-chart-status-critical); flex: none; }
+  .bm-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); gap: var(--cds-gap-md); counter-reset: bmstep; }
+  .bm-steps li { counter-increment: bmstep; position: relative; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); padding: var(--cds-pad-md) var(--cds-pad-sm); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; }
+  .bm-steps li::before { content: counter(bmstep, decimal-leading-zero); font-size: var(--cds-font-size-caption); color: var(--color-bad); font-weight: var(--cds-font-weight-medium); }
+  .bm-steps li:not(:last-child)::after { content: "›"; position: absolute; right: calc(-0.5 * var(--cds-gap-md) - 4px); top: 50%; transform: translateY(-50%); color: var(--color-fg-muted); }
+  .bm-steps li span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.4; }
+  .bm-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: var(--cds-gap-md); }
+  .bm-three { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--cds-gap-md); }
+  .bm-box { border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); padding: var(--cds-pad-md); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .bm-box-t { font-size: var(--cds-font-size-body); }
+  .bm-dl { margin: var(--cds-gap-xs) 0 0; }
+  .bm-dl > div { display: flex; justify-content: space-between; gap: var(--cds-gap-sm); padding: 6px 0; border-bottom: 1px dashed var(--color-border-line); font-size: var(--cds-font-size-body); }
+  .bm-dl > div:last-child { border-bottom: 0; }
+  .bm-dl dt { color: var(--color-fg-muted); }
+  .bm-dl dd { margin: 0; font-weight: var(--cds-font-weight-medium); font-variant-numeric: tabular-nums; text-align: right; }
+  .bm-dl .bm-hot dd { color: var(--color-bad); }
+  .bm-red { color: var(--color-bad); }
+  .bm-big { margin: 0; font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); color: var(--color-bad); line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .bm-eq { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: var(--cds-gap-sm); align-items: stretch; }
+  .bm-eq .bm-box { align-items: center; justify-content: center; text-align: center; }
+  .bm-op { align-self: center; font-size: var(--cds-font-size-title); color: var(--color-fg-muted); }
+  .bm-eqv { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); line-height: 1.2; font-variant-numeric: tabular-nums; }
+  @container (max-width: 560px) { .bm-eq { grid-template-columns: 1fr; } .bm-op { text-align: center; } .bm-steps li::after { display: none; } }
+  .bm-quote { margin: 0; border-left: 3px solid var(--cds-chart-status-critical); background: var(--color-bg); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); font-size: var(--cds-font-size-heading); line-height: 1.7; }
+</style>
+
+<div class="cw" id="crwv">
+  <header class="cw-head" id="overview">
+    <h1 class="cw-title">CoreWeave (CRWV) debt stack, cash waterfall and maturity wall</h1>
+    <p class="cw-take dash-skeleton" id="takeaway"></p>
+    <div class="cw-controls" id="controls">
+      <span class="cw-note">Adj. EBITDA scenario</span>
+      <div class="cw-seg" role="group" aria-label="Adj. EBITDA scenario" id="scenario-ctl">
+        <button type="button" data-scn="consensus">Consensus</button>
+        <button type="button" data-scn="runoff">Backlog run-off</button>
+        <button type="button" data-scn="stress">Stress</button>
+      </div>
+    </div>
+    <p class="cw-note" id="scenario-method"></p>
+    <p class="cw-note">Debt per the Jun 30, 2026 10-Q, pro forma for the post-quarter DDTL 5.5 and revolver draws and the Sep 2026 converts · bond prices mid-Oct 2026 · consensus as of Oct 15, 2026.</p>
+  </header>
+
+  <section class="cw-kpis" id="kpis" aria-label="Headline figures">
+    <div class="cw-kpi" id="kpi-debt">
+      <span class="cw-kpi-label">Debt, pro forma</span>
+      <span class="cw-kpi-value dash-skeleton" data-fmt="d1" data-sfx="B" data-source="kpis" data-field="debt_pf" data-row="0">—</span>
+      <span class="cw-kpi-sub">plus <span data-fmt="d1" data-sfx="B" data-source="market" data-field="value" data-where="key=op_leases">—</span> of lease liabilities</span>
+    </div>
+    <div class="cw-kpi" id="kpi-leverage">
+      <span class="cw-kpi-label">Debt ÷ Q2 adj. EBITDA × 4</span>
+      <span class="cw-kpi-value dash-skeleton" data-fmt="x1" data-source="kpis" data-field="leverage" data-row="0">—</span>
+      <span class="cw-kpi-sub">Q2 adj. EBITDA <span data-fmt="d2" data-sfx="B" data-source="market" data-field="value" data-where="key=q2_ebitda">—</span></span>
+    </div>
+    <div class="cw-kpi" id="kpi-cover">
+      <span class="cw-kpi-label">Adj. EBITDA ÷ interest, Q2</span>
+      <span class="cw-kpi-value dash-skeleton" data-fmt="x1" data-source="kpis" data-field="interest_cover" data-row="0">—</span>
+      <span class="cw-kpi-sub">Q3 interest guide ≈ <span data-fmt="d2" data-sfx="B" data-source="market" data-field="value" data-where="key=q3_interest_guide">—</span> vs Q2 <span data-fmt="d2" data-sfx="B" data-source="market" data-field="value" data-where="key=q2_interest">—</span></span>
+    </div>
+    <div class="cw-kpi" id="kpi-yield">
+      <span class="cw-kpi-label">Unsecured notes, yield to worst</span>
+      <span class="cw-kpi-value"><span class="dash-skeleton" data-fmt="p2" data-sfx="%" data-source="market" data-field="value" data-where="key=ytw_low">—</span>–<span class="dash-skeleton" data-fmt="p2" data-sfx="%" data-source="market" data-field="value" data-where="key=ytw_high">—</span></span>
+      <span class="cw-kpi-sub">Oct 19 · notes B1 / B, issuer Ba3 / B+</span>
+    </div>
+    <div class="cw-kpi" id="kpi-due">
+      <span class="cw-kpi-label">Principal due by end-2027</span>
+      <span class="cw-kpi-value dash-skeleton" data-fmt="d1" data-sfx="B" data-source="kpis" data-field="due_by_2027" data-row="0">—</span>
+      <span class="cw-kpi-sub">10-Q schedule for Jun 30 debt</span>
+    </div>
+    <div class="cw-kpi" id="kpi-equity">
+      <span class="cw-kpi-label">Equity cushion, market cap</span>
+      <span class="cw-kpi-value dash-skeleton" data-fmt="d1" data-sfx="B" data-source="kpis" data-field="mcap" data-row="0">—</span>
+      <span class="cw-kpi-sub"><span data-fmt="share" data-source="kpis" data-field="equity_share" data-row="0">—</span> of debt plus equity</span>
+    </div>
+  </section>
+
+  <h2 class="cw-h2" id="structure">Capital structure, senior to junior</h2>
+  <div class="cw-grid">
+    <div class="cw-card" id="stack-card">
+      <h3>Tranche stack, CLO view</h3>
+      <p class="cw-note">Each class's height is its share of debt plus equity at market value. Cushion is the share of capital junior to the class, its attachment point.</p>
+      <div class="cw-chart dash-skeleton" id="stack-chart" data-source="stack" style="min-height: 392px"></div>
+      <p class="cw-note">Not in the stack: data-center rent, paid before EBITDA like a CLO's senior fees — <span data-fmt="d1" data-sfx="B" data-source="market" data-field="value" data-where="key=op_leases">—</span> on the balance sheet plus <span data-fmt="d1" data-sfx="B" data-source="market" data-field="value" data-where="key=leases_uncommenced">—</span> signed but not yet started.</p>
+    </div>
+    <div class="cw-card" id="curve-card">
+      <h3>Yield by tranche and maturity</h3>
+      <p class="cw-note">Bubble size is principal. Loans show their all-in coupon at SOFR <span data-fmt="p2" data-sfx="%" data-source="market" data-field="value" data-where="key=sofr">—</span>; notes and converts show market yield to maturity from mid-October prices.</p>
+      <div class="cw-chart dash-skeleton" id="curve-chart" data-source="instruments market" style="min-height: 340px"></div>
+      <div class="cw-legend" id="curve-legend" data-source="stack"></div>
+    </div>
+  </div>
+  <div class="cw-card" id="effrate-card">
+    <p class="cw-kicker">CoreWeave · Nasdaq: CRWV</p>
+    <h3 id="effrate-title">CoreWeave's debt stack, by what they actually pay</h3>
+    <p class="cw-note">Principal outstanding at June 30, 2026, with the effective interest rate disclosed for each facility, highest first.</p>
+    <div class="er-head" aria-hidden="true"><span>Rate</span><span>Facility</span><span>Principal outstanding, $ millions</span></div>
+    <div class="er-list dash-skeleton" id="effrate-chart" data-source="instruments" style="min-height: 640px"></div>
+    <div class="er-kpis">
+      <div><span class="er-kv dash-skeleton" data-fmt="dm" data-sfx="M" data-source="effstack" data-field="total_jun26_m" data-row="0">—</span><span class="cw-note">total principal outstanding</span></div>
+      <div><span class="er-kv dash-skeleton" data-fmt="p1" data-sfx="%" data-source="market" data-field="value" data-where="key=eff_rate_wavg">—</span><span class="cw-note">weighted average effective rate</span></div>
+      <div><span class="er-kv dash-skeleton" data-fmt="share1" data-source="effstack" data-field="headline_share" data-row="0">—</span><span class="cw-note">of the stack is the 2032 9.625% notes</span></div>
+    </div>
+    <p class="cw-note">Source: CoreWeave Q2 2026 Form 10-Q, Note 10, Debt. Rates as disclosed, rounded to whole percent; debt added after June 30 isn't shown.</p>
+  </div>
+
+  <h2 class="cw-h2" id="wall">When the payouts hit the wall</h2>
+  <div class="cw-card" id="wall-card">
+    <h3>Payout wall vs adj. EBITDA</h3>
+    <p class="cw-note">Interest plus scheduled principal on today's debt by year, stacked senior (bottom) to junior. The line is adj. EBITDA under the chosen scenario; red is payout it doesn't cover. Click a year to open its waterfall.</p>
+    <div class="cw-chart dash-skeleton" id="wall-chart" data-source="wall coverage" style="min-height: 320px"></div>
+    <div class="cw-legend" id="wall-legend" data-source="stack"></div>
+  </div>
+  <div class="cw-grid">
+    <div class="cw-card" id="dscr-card">
+      <h3>Debt-service coverage by scenario</h3>
+      <p class="cw-note">Adj. EBITDA ÷ (interest + scheduled principal) on today's debt. Below 1.0x the gap has to be refinanced or raised.</p>
+      <div class="cw-chart dash-skeleton" id="dscr-chart" data-source="coverage" style="min-height: 280px"></div>
+    </div>
+    <div class="cw-card" id="funding-card">
+      <h3>The other wall: cash CoreWeave must raise each year</h3>
+      <p class="cw-note">Each year the plan needs cash for two things: building data centers and buying GPUs (capex), and repaying debt that comes due. Cash from operations pays for the green part; the red part has to come from new loans, bonds or shares. Street consensus plan.</p>
+      <div class="fd-head">
+        <span class="fd-big bm-red" data-fmt="d1" data-sfx="B" data-source="funding_sum" data-field="total_gap" data-row="0">—</span>
+        <span class="cw-note">to raise from 2H 2026 through 2028 — <b data-fmt="x1" data-source="funding_sum" data-field="multiple" data-row="0">—</b> all the debt outstanding today (<span data-fmt="d1" data-sfx="B" data-source="funding_sum" data-field="debt_pf" data-row="0">—</span>)</span>
+      </div>
+      <div class="cw-chart dash-skeleton" id="funding-chart" data-source="funding funding_sum" style="min-height: 250px"></div>
+      <div class="cw-legend" id="funding-legend"></div>
+      <p class="cw-note">The raise is a floor: it leaves out repaying the new debt itself. Interest on new debt is already inside consensus operating cash flow.</p>
+    </div>
+  </div>
+
+  <h2 class="cw-h2" id="waterfall">Cash waterfall</h2>
+  <div class="cw-card" id="waterfall-card">
+    <h3 id="waterfall-title">Where a year of adj. EBITDA goes</h3>
+    <p class="cw-note">Like a CLO payment waterfall: SPV lenders (A–C) are paid interest and amortization first from contract cash; what is left goes up to the parent for interest on D–F, then their principal. Where cash runs below zero, the rest has to be refinanced.</p>
+    <div class="cw-chips" id="period-ctl" role="group" aria-label="Year"></div>
+    <div class="cw-chart dash-skeleton" id="waterfall-chart" data-source="waterfall" style="min-height: 330px"></div>
+  </div>
+
+  <h2 class="cw-h2" id="business-model">CoreWeave 的生意模型</h2>
+  <div class="cw-card bm" id="bm-card">
+    <p class="cw-kicker">Off-consensus · 生意模型拆解</p>
+    <p class="bm-lede">一句话：<b>算力房东</b>。先用长期租约锁住收入，再拿租约去借钱，最后用借来的钱买 GPU。</p>
+
+    <h3 class="bm-h" id="bm-loop">钱转一圈</h3>
+    <ol class="bm-steps">
+      <li><b>签长约</b><span>take-or-pay<br><span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=contract_term_low">—</span>–<span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=contract_term_high">—</span> 年</span></li>
+      <li><b>抵押合约借钱</b><span>合约 + GPU +<br>现金流</span></li>
+      <li><b>买卡建机房</b><span>capex<br>大头</span></li>
+      <li><b>交付算力收租</b><span>按 MW-月</span></li>
+      <li><b>付息、再借</b><span>扩表</span></li>
+      <li><b>回到第一步</b><span>签新约</span></li>
+    </ol>
+    <p class="cw-note">循环成立只靠两件事：<b>新合约不断</b>，<b>债务市场开着</b>。缺一个就停摆。</p>
+
+    <h3 class="bm-h" id="bm-unit">单位经济：两个版本</h3>
+    <div class="bm-two">
+      <div class="bm-box" id="bm-gs">
+        <b class="bm-box-t">高盛的单项目模型</b>
+        <span class="cw-note"><span data-fmt="d0" data-sfx="B" data-source="biz_model" data-field="value" data-where="key=gs_capex">—</span> capex / <span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=gs_term_years">—</span> 年期合约</span>
+        <dl class="bm-dl">
+          <div><dt>年收入</dt><dd data-fmt="d1" data-sfx="B" data-source="biz_model" data-field="value" data-where="key=gs_revenue">—</dd></div>
+          <div><dt>opex</dt><dd data-fmt="dm" data-sfx="M" data-source="biz_model" data-field="value" data-where="key=gs_opex">—</dd></div>
+          <div><dt>现金税</dt><dd data-fmt="dm" data-sfx="M" data-source="biz_model" data-field="value" data-where="key=gs_cash_tax">—</dd></div>
+          <div><dt>税后无杠杆现金流</dt><dd><span data-fmt="d3" data-sfx="B" data-source="unit_econ" data-field="ucf" data-row="0">—</span>/年</dd></div>
+          <div class="bm-hot"><dt>回收期</dt><dd><span data-fmt="n1" data-source="unit_econ" data-field="payback" data-row="0">—</span> 年</dd></div>
+          <div class="bm-hot"><dt>无杠杆 IRR</dt><dd data-fmt="p1" data-sfx="%" data-source="unit_econ" data-field="irr" data-row="0">—</dd></div>
+        </dl>
+      </div>
+      <div class="bm-box" id="bm-actual">
+        <b class="bm-box-t">公司实际</b>
+        <span class="cw-note">2026 年二季度</span>
+        <dl class="bm-dl">
+          <div><dt>收入</dt><dd><span data-fmt="d2" data-sfx="B" data-source="market" data-field="value" data-where="key=q2_revenue">—</span>（<span data-fmt="yoy" data-source="unit_econ" data-field="rev_yoy" data-row="0">—</span>）</dd></div>
+          <div><dt>调整后 EBITDA 率</dt><dd data-fmt="share" data-source="unit_econ" data-field="q2_margin" data-row="0">—</dd></div>
+          <div><dt>净亏损</dt><dd data-fmt="dm" data-sfx="M" data-source="unit_econ" data-field="q2_net_loss_m" data-row="0">—</dd></div>
+          <div><dt>利息支出</dt><dd data-fmt="dm" data-sfx="M" data-source="unit_econ" data-field="q2_interest_m" data-row="0">—</dd></div>
+          <div><dt>利息占收入</dt><dd data-fmt="share" data-source="unit_econ" data-field="q2_interest_rev" data-row="0">—</dd></div>
+          <div><dt>收入积压</dt><dd data-fmt="d0" data-sfx="B" data-source="market" data-field="value" data-where="key=rpo">—</dd></div>
+        </dl>
+      </div>
+    </div>
+    <p class="cw-note">高盛模型隐含 EBITDA 率 <b class="bm-red" data-fmt="share1" data-source="unit_econ" data-field="gs_margin" data-row="0">—</b>，公司实际 <b class="bm-red" data-fmt="share" data-source="unit_econ" data-field="q2_margin" data-row="0">—</b>——模型按成熟合约算，现实还没到。</p>
+
+    <h3 class="bm-h" id="bm-assumptions">三个决定生死的假设</h3>
+    <div class="bm-three">
+      <div class="bm-box" id="bm-gpu-life">
+        <p class="bm-big"><span data-fmt="share" data-source="unit_econ" data-field="dep_share_base" data-row="0">—</span> → <span data-fmt="share" data-source="unit_econ" data-field="dep_share_fast" data-row="0">—</span></p>
+        <b>GPU 能用几年</b>
+        <p class="cw-note"><span data-fmt="d0" data-sfx="B" data-source="biz_model" data-field="value" data-where="key=gs_capex">—</span> 按 <span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=dep_years_base">—</span> 年折旧，一年占收入 <span data-fmt="share" data-source="unit_econ" data-field="dep_share_base" data-row="0">—</span>；按 <span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=dep_years_fast">—</span> 年折旧就是 <span data-fmt="share" data-source="unit_econ" data-field="dep_share_fast" data-row="0">—</span>，利润归零。英伟达几年换一代，比利率更能决定这家公司。</p>
+      </div>
+      <div class="bm-box" id="bm-contracts">
+        <p class="bm-big"><span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=cancel_notice_days">—</span> 天</p>
+        <b>合约真能跑满吗</b>
+        <p class="cw-note">纸面 <span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=contract_term_low">—</span>–<span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=contract_term_high">—</span> 年，但高盛另一篇说多数托管合约双方可 <span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=cancel_notice_days">—</span> 天内取消。若如此，<span data-fmt="d0" data-sfx="B" data-source="market" data-field="value" data-where="key=rpo">—</span> 订单簿只是意向书。</p>
+      </div>
+      <div class="bm-box" id="bm-funding-cost">
+        <p class="bm-big"><span data-fmt="p0" data-sfx="%" data-source="unit_econ" data-field="notes_yield_low" data-row="0">—</span> ↑</p>
+        <b>借钱还便宜吗</b>
+        <p class="cw-note">项目回报 <span data-fmt="p1" data-sfx="%" data-source="unit_econ" data-field="irr" data-row="0">—</span>，无担保债已经 <span data-fmt="int0" data-source="unit_econ" data-field="notes_yield_low" data-row="0">—</span>–<span data-fmt="p0" data-sfx="%" data-source="unit_econ" data-field="notes_yield_high" data-row="0">—</span>。利差被吃光，杠杆就从放大收益变成放大亏损。</p>
+      </div>
+    </div>
+
+    <h3 class="bm-h" id="bm-spread">本质上是一门利差生意</h3>
+    <div class="bm-eq">
+      <div class="bm-box"><span class="cw-note">资产端 · 项目回报</span><span class="bm-eqv" data-fmt="p1" data-sfx="%" data-source="unit_econ" data-field="irr" data-row="0">—</span></div>
+      <span class="bm-op">−</span>
+      <div class="bm-box"><span class="cw-note">负债端 · 资金成本</span><span class="bm-eqv bm-red"><span data-fmt="int0" data-source="unit_econ" data-field="cost_low" data-row="0">—</span>–<span data-fmt="p0" data-sfx="%" data-source="unit_econ" data-field="cost_high" data-row="0">—</span></span></div>
+      <span class="bm-op">=</span>
+      <div class="bm-box"><span class="cw-note">利差 · 加杠杆前的回报</span><span class="bm-eqv"><span data-fmt="signed" data-source="unit_econ" data-field="spread_at_low" data-row="0">—</span> → <span data-fmt="signed" data-source="unit_econ" data-field="spread_at_high" data-row="0">—</span></span></div>
+    </div>
+    <p class="cw-note">资金成本 <span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=cost_good_low">—</span>–<span data-fmt="p0" data-sfx="%" data-source="biz_model" data-field="value" data-where="key=cost_good_high">—</span> 时，利差有 <span data-fmt="int0" data-source="unit_econ" data-field="spread_good_low" data-row="0">—</span>–<span data-fmt="int0" data-source="unit_econ" data-field="spread_good_high" data-row="0">—</span> 个点，是好生意；<span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=cost_bad_low">—</span>–<span data-fmt="p0" data-sfx="%" data-source="biz_model" data-field="value" data-where="key=cost_bad_high">—</span> 时利差归零甚至为负。<b>决定它拿哪个价格的不是项目，是信用市场对 AI 的整体态度。</b> 资金成本区间取 10-Q 加权有效利率到美元无担保债的最高收益率。</p>
+
+    <blockquote class="bm-quote" id="bm-quote">它把未来 <span data-fmt="int" data-source="biz_model" data-field="value" data-where="key=discount_horizon_years">—</span> 年的算力租金提前贴现，换成今天的一张张 GPU。贴现率是它和资本市场谈出来的——<span data-fmt="p0" data-sfx="%" data-source="biz_model" data-field="value" data-where="key=discount_growth">—</span> 时它是成长股，<span data-fmt="p0" data-sfx="%" data-source="biz_model" data-field="value" data-where="key=discount_hy">—</span> 时它是高息债。</blockquote>
+    <p class="cw-note">数据：高盛 2026-10-19 模型 · CoreWeave 2026Q2 财报 · Reuters Factbox 2026-10-15 · 制图 2026-10-20。图中高盛数字为示意性单项目模型，非公司实际财务；IRR 与回收期按模型输入重算，不含残值。</p>
+  </div>
+
+  <h2 class="cw-h2" id="tranches">Tranche detail</h2>
+  <div class="cw-card" id="table-card">
+    <h3>Every instrument, senior to junior</h3>
+    <p class="cw-note">Click a column name to sort; click again to reverse. Rating sorts by Moody's scale, unrated last. Principal is pro forma. Yield is market yield to maturity for notes and converts (converts at their bond floor) and the all-in coupon for loans; vendor-financing rates are estimates.</p>
+    <div class="cw-table-wrap">
+      <table class="cw-table" id="tranche-table" data-source="instruments" data-row-key="id">
+        <thead>
+          <tr>
+            <th data-field="class" aria-sort="ascending"><button type="button" class="cw-sort" data-sort="class">Class</button></th>
+            <th data-field="instrument" aria-sort="none"><button type="button" class="cw-sort" data-sort="instrument">Instrument</button></th>
+            <th data-field="principal_pf" class="num" aria-sort="none"><button type="button" class="cw-sort" data-sort="principal_pf">Principal, $B</button></th>
+            <th data-field="rating" aria-sort="none"><button type="button" class="cw-sort" data-sort="rating">Rating</button></th>
+            <th data-field="coupon" class="cw-hide-narrow" aria-sort="none"><button type="button" class="cw-sort" data-sort="coupon">Coupon</button></th>
+            <th data-field="yield_pct" class="num" aria-sort="none"><button type="button" class="cw-sort" data-sort="yield_pct">Yield</button></th>
+            <th data-field="price" class="num cw-hide-narrow" aria-sort="none"><button type="button" class="cw-sort" data-sort="price">Price</button></th>
+            <th data-field="maturity" aria-sort="none"><button type="button" class="cw-sort" data-sort="maturity">Maturity</button></th>
+            <th data-field="security" class="cw-hide-narrow" aria-sort="none"><button type="button" class="cw-sort" data-sort="security">Security</button></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2 class="cw-h2" id="method">How this is built</h2>
+  <div class="cw-card cw-method" id="method-card">
+    <p><b>Principal by year</b> for amortizing loans is modeled: each facility's balance is spread over its life and scaled so the totals match the 10-Q schedule for Jun 30 debt — 2H26 <span data-fmt="d1" data-sfx="B" data-source="reported_maturities" data-field="principal" data-where="period=2H26">—</span>, 2027 <span data-fmt="d1" data-sfx="B" data-source="reported_maturities" data-field="principal" data-where="period=2027">—</span>, 2028 <span data-fmt="d1" data-sfx="B" data-source="reported_maturities" data-field="principal" data-where="period=2028">—</span>, 2029 <span data-fmt="d1" data-sfx="B" data-source="reported_maturities" data-field="principal" data-where="period=2029">—</span>, 2030 <span data-fmt="d1" data-sfx="B" data-source="reported_maturities" data-field="principal" data-where="period=2030">—</span>, after 2030 <span data-fmt="d1" data-sfx="B" data-source="reported_maturities" data-field="principal" data-where="period=thereafter">—</span>. Notes, converts and the revolver are bullets at maturity.</p>
+    <p><b>Interest</b> is the cash coupon on each month's balance, with SOFR held at <span data-fmt="p2" data-sfx="%" data-source="market" data-field="value" data-where="key=sofr">—</span>. Reported interest runs higher (discount amortization and new draws), so these payouts are a floor.</p>
+    <p><b>Today's debt only:</b> undrawn commitments and future borrowing are left out of the wall. The funding chart shows the new capital the consensus plan needs; its interest is already inside consensus operating cash flow.</p>
+    <p><b>Scenarios:</b> consensus EBITDA runs to 2028 and is held flat after. Backlog run-off recognizes only the <span data-fmt="d1" data-sfx="B" data-source="market" data-field="value" data-where="key=rpo">—</span> Jun 30 backlog on its disclosed timing, with no new contracts. Stress cuts that backlog for a top-customer shock.</p>
+    <p><b>The stack is an analogy:</b> each SPV loan is secured by its own GPU pool and contracts rather than one shared collateral pool; converts rank equal to the notes legally and sit last here as the equity-linked layer.</p>
+  </div>
+</div>
+
+<script>
+const CW_CLASSES = ['A', 'B', 'C', 'D', 'E', 'F'];
+const cwP = (p) => (p === '2H26' ? 2026 : Number(p));
+
+dash.calc('stack', {
+  inputs: ['instruments', 'market'],
+  title: 'Capital stack by class',
+  description: 'Pro forma principal per class plus equity at market cap; attach is the share of capital junior to the class.',
+  fn: (instruments, market) => {
+    const mcap = Number(market.find((r) => r.key === 'mcap').value);
+    const by = new Map();
+    for (const r of instruments) {
+      const p = Number(r.principal_pf);
+      const c = by.get(r.class) || { class: r.class, class_name: r.class_name, rank: Number(r.rank), principal: 0, wy: 0, instruments: 0, ratings: [] };
+      c.principal += p;
+      c.wy += p * Number(r.yield_pct);
+      c.instruments += 1;
+      if (!c.ratings.includes(r.rating)) c.ratings.push(r.rating);
+      by.set(r.class, c);
+    }
+    const rows = [...by.values()].sort((a, b) => a.rank - b.rank).map((c) => ({
+      class: c.class, class_name: c.class_name, rank: c.rank, principal: c.principal,
+      yield_pct: c.wy / c.principal, instruments: c.instruments, ratings: c.ratings.join(', '),
+    }));
+    rows.push({ class: 'Equity', class_name: 'Equity at market cap', rank: 7, principal: mcap, yield_pct: null, instruments: 0, ratings: '' });
+    const total = rows.reduce((s, r) => s + r.principal, 0);
+    let below = total;
+    return rows.map((r) => {
+      below -= r.principal;
+      return { ...r, share: r.principal / total, attach: below / total, detach: (below + r.principal) / total };
+    });
+  },
+});
+
+dash.calc('wall', {
+  inputs: ['debt_service', 'instruments'],
+  title: 'Payout by year and class',
+  description: 'Modeled interest and scheduled principal on today’s debt, summed by class and year.',
+  fn: (debt_service, instruments) => {
+    const cls = new Map(instruments.map((r) => [r.id, r.class]));
+    const out = new Map();
+    for (const r of debt_service) {
+      const k = r.period + '|' + cls.get(r.instrument);
+      const o = out.get(k) || { key: k, period: r.period, class: cls.get(r.instrument), principal: 0, interest: 0 };
+      o.principal += Number(r.principal);
+      o.interest += Number(r.interest);
+      out.set(k, o);
+    }
+    return [...out.values()].map((o) => ({ ...o, debt_service: o.principal + o.interest }));
+  },
+});
+
+dash.calc('coverage', {
+  inputs: ['wall', 'consensus', 'scenarios_model'],
+  title: 'Coverage by scenario and year',
+  description: 'Adj. EBITDA per scenario against interest plus scheduled principal on today’s debt.',
+  fn: (wall, consensus, scenarios_model) => {
+    const due = new Map();
+    for (const r of wall) {
+      const d = due.get(r.period) || { principal: 0, interest: 0 };
+      d.principal += r.principal;
+      d.interest += r.interest;
+      due.set(r.period, d);
+    }
+    const ebitda = [
+      ...consensus.map((r) => ({ period: r.period, scenario: 'consensus', ebitda: Number(r.ebitda), extrapolated: false })),
+      ...scenarios_model.map((r) => ({ period: r.period, scenario: r.scenario, ebitda: Number(r.ebitda), extrapolated: r.scenario === 'consensus' })),
+    ];
+    return ebitda.map((e) => {
+      const d = due.get(e.period) || { principal: 0, interest: 0 };
+      const debt_service = d.principal + d.interest;
+      return { ...e, principal: d.principal, interest: d.interest, debt_service, dscr: debt_service > 0 ? e.ebitda / debt_service : null, surplus: e.ebitda - debt_service };
+    });
+  },
+});
+
+dash.calc('waterfall', {
+  inputs: ['wall', 'coverage'],
+  title: 'Cash waterfall steps',
+  description: 'Adj. EBITDA paid down the stack: SPV classes A–C (interest and amortization), then parent interest D–F, then parent principal D–F; below zero is the refinancing need.',
+  fn: (wall, coverage) => {
+    const steps = [['A', 'all'], ['B', 'all'], ['C', 'all'], ['D', 'interest'], ['E', 'interest'], ['F', 'interest'], ['D', 'principal'], ['E', 'principal'], ['F', 'principal']];
+    const rows = [];
+    for (const c of coverage) {
+      let cash = c.ebitda;
+      steps.forEach(([cls, part], i) => {
+        const w = wall.find((r) => r.period === c.period && r.class === cls);
+        const due = !w ? 0 : part === 'all' ? w.debt_service : w[part];
+        rows.push({ scenario: c.scenario, period: c.period, step: i + 1, class: cls, part, due, cash_before: cash, cash_after: cash - due, refinanced: Math.max(0, due - Math.max(0, cash)) });
+        cash -= due;
+      });
+      rows.push({ scenario: c.scenario, period: c.period, step: 10, class: 'Residual', part: cash >= 0 ? 'to equity' : 'shortfall', due: 0, cash_before: cash, cash_after: cash, refinanced: Math.max(0, -cash) });
+    }
+    return rows;
+  },
+});
+
+dash.calc('funding', {
+  inputs: ['consensus', 'wall'],
+  title: 'Funding gap, consensus plan',
+  description: 'Consensus capex plus scheduled principal on today’s debt, less consensus operating cash flow.',
+  fn: (consensus, wall) => consensus.map((r) => {
+    const principal = wall.filter((w) => w.period === r.period).reduce((s, w) => s + w.principal, 0);
+    const capex = Number(r.capex);
+    const cfo = Number(r.cfo);
+    const uses = capex + principal;
+    return { period: r.period, capex, principal, cfo, uses, gap: uses - cfo, self_funded_share: Math.min(cfo, uses) / uses };
+  }),
+});
+
+dash.calc('funding_sum', {
+  inputs: ['funding', 'instruments'],
+  title: 'Capital to raise, consensus plan',
+  description: 'Sum of the yearly funding gaps from 2H26 through 2028, and that sum as a multiple of today’s pro forma debt.',
+  fn: (funding, instruments) => {
+    const total_gap = funding.reduce((s, r) => s + Math.max(0, r.gap), 0);
+    const debt_pf = instruments.reduce((s, r) => s + Number(r.principal_pf), 0);
+    return [{ total_gap, debt_pf, multiple: total_gap / debt_pf }];
+  },
+});
+
+dash.calc('summary', {
+  inputs: ['coverage', 'wall', 'instruments'],
+  title: 'Headline by scenario',
+  description: 'Years EBITDA misses the payout, the total shortfall, the tightest year, unsecured and convertible bullets due 2031–33, and the notes’ average market yield.',
+  fn: (coverage, wall, instruments) => {
+    const notes = instruments.filter((r) => r.class === 'E' && r.price !== null);
+    const weight = notes.reduce((s, r) => s + Number(r.principal_pf), 0);
+    const notes_yield = notes.reduce((s, r) => s + Number(r.principal_pf) * Number(r.yield_pct), 0) / weight;
+    const bullets_2031_33 = wall.filter((r) => (r.class === 'E' || r.class === 'F') && ['2031', '2032', '2033'].includes(r.period)).reduce((s, r) => s + r.principal, 0);
+    const order = (p) => (p === '2H26' ? 2026 : Number(p));
+    return ['consensus', 'runoff', 'stress'].map((scenario) => {
+      const rows = coverage.filter((r) => r.scenario === scenario).sort((a, b) => order(a.period) - order(b.period));
+      const miss = rows.filter((r) => r.dscr !== null && r.dscr < 1);
+      const worst = rows.reduce((a, b) => ((b.dscr ?? Infinity) < (a.dscr ?? Infinity) ? b : a));
+      return {
+        scenario, miss_years: miss.map((r) => r.period).join(', '), miss_count: miss.length,
+        shortfall: miss.reduce((s, r) => s - r.surplus, 0), worst_period: worst.period, worst_dscr: worst.dscr,
+        bullets_2031_33, notes_yield,
+      };
+    });
+  },
+});
+
+dash.calc('effstack', {
+  inputs: ['instruments'],
+  title: 'Jun 30 stack totals',
+  description: 'Principal outstanding at Jun 30, 2026, and the 2032 9.625% notes’ share of it.',
+  fn: (instruments) => {
+    const total = instruments.reduce((s, r) => s + Number(r.principal_jun26), 0);
+    const headline = instruments.find((r) => r.id === 'n32');
+    return [{ total_jun26: total, total_jun26_m: total * 1000, headline_share: Number(headline.principal_jun26) / total }];
+  },
+});
+
+dash.calc('unit_econ', {
+  inputs: ['biz_model', 'market', 'instruments'],
+  title: 'Unit economics and spread',
+  description: 'Goldman single-project cash flow (opex and tax in $M), payback and IRR (level cash flow over the contract, no residual value); Q2 2026 ratios in $M; and project IRR less the cost of debt, from the 10-Q average effective rate to the highest USD unsecured note yield.',
+  fn: (biz_model, market, instruments) => {
+    const b = (k) => Number(biz_model.find((r) => r.key === k).value);
+    const m = (k) => Number(market.find((r) => r.key === k).value);
+    const capex = b('gs_capex');
+    const rev = b('gs_revenue');
+    const years = b('gs_term_years');
+    const ucf = rev - b('gs_opex') / 1000 - b('gs_cash_tax') / 1000;
+    const npv = (r) => (ucf * (1 - (1 + r) ** -years)) / r - capex;
+    let lo = 0.0001;
+    let hi = 1;
+    for (let i = 0; i < 100; i++) { const mid = (lo + hi) / 2; if (npv(mid) > 0) lo = mid; else hi = mid; }
+    const irr = lo * 100;
+    const notes = instruments.filter((r) => r.class === 'E' && r.currency === 'USD' && r.price !== null).map((r) => Number(r.yield_pct));
+    const cost_low = m('eff_rate_wavg');
+    const cost_high = Math.max(...notes);
+    return [{
+      ucf, payback: capex / ucf, irr, gs_margin: (rev - b('gs_opex') / 1000) / rev,
+      dep_share_base: capex / b('dep_years_base') / rev, dep_share_fast: capex / b('dep_years_fast') / rev,
+      q2_margin: m('q2_ebitda') / m('q2_revenue'), rev_yoy: m('q2_revenue') / m('q2_2025_revenue') - 1,
+      q2_interest_rev: m('q2_interest') / m('q2_revenue'), q2_interest_m: m('q2_interest') * 1000, q2_net_loss_m: m('q2_net_loss') * 1000,
+      notes_yield_low: Math.min(...notes), notes_yield_high: cost_high, cost_low, cost_high,
+      spread_at_low: irr - cost_low, spread_at_high: irr - cost_high,
+      spread_good_low: irr - b('cost_good_high'), spread_good_high: irr - b('cost_good_low'),
+    }];
+  },
+});
+
+dash.calc('kpis', {
+  inputs: ['instruments', 'market', 'reported_maturities'],
+  title: 'Headline credit metrics',
+  description: 'Pro forma debt, leverage and interest cover on Q2 2026 adj. EBITDA, principal due by end-2027 (10-Q), and equity’s share of debt plus equity.',
+  fn: (instruments, market, reported_maturities) => {
+    const m = (k) => Number(market.find((r) => r.key === k).value);
+    const debt = instruments.reduce((s, r) => s + Number(r.principal_pf), 0);
+    const due = reported_maturities.filter((r) => r.period === '2H26' || r.period === '2027').reduce((s, r) => s + Number(r.principal), 0);
+    return [{
+      debt_pf: debt, leverage: debt / (m('q2_ebitda') * 4), interest_cover: m('q2_ebitda') / m('q2_interest'),
+      due_by_2027: due, mcap: m('mcap'), equity_share: m('mcap') / (debt + m('mcap')),
+    }];
+  },
+});
+</script>
+
+<script>
+(() => {
+  const root = document.getElementById('crwv');
+  const SCN = { consensus: 'Consensus', runoff: 'Backlog run-off', stress: 'Stress' };
+  const CLASSES = ['A', 'B', 'C', 'D', 'E', 'F'];
+  const pkey = (p) => (p === '2H26' ? 2026 : Number(p));
+  const clsColor = (c) => (c === 'Equity' ? 'var(--cds-chart-muted)' : dash.colors[CLASSES.indexOf(c)]);
+  const CASH = () => dash.colors[6];
+  const CRIT = 'var(--cds-chart-status-critical)';
+  const ok = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
+  const fB = (v) => (!ok(v) ? '—' : (v < -0.0005 ? '−' : '') + '$' + d3.format(Math.abs(v) >= 10 ? ',.1f' : '.2f')(Math.abs(v) + 1e-9) + 'B');
+  const fB1 = (v) => (!ok(v) ? '—' : '$' + d3.format(',.1f')(v) + 'B');
+  const fX = (v) => (!ok(v) ? '—' : d3.format('.2f')(v) + 'x');
+  const fX1 = (v) => (!ok(v) ? '—' : d3.format('.1f')(v) + 'x');
+  const fPct = (v) => (!ok(v) ? '—' : d3.format('.2~f')(v) + '%');
+  const fPct1 = (v) => (!ok(v) ? '—' : d3.format('.1f')(v) + '%');
+  const fShare = (v) => (!ok(v) ? '—' : d3.format('.0%')(v));
+  const fM = (v) => (!ok(v) ? '—' : (v < 0 ? '−' : '') + '$' + d3.format(',')(Math.round(Math.abs(v) * 1000)) + 'M');
+  const fMc = (v) => (!ok(v) ? '—' : '$' + d3.format(',')(Math.round(Number(v) * 1000)));
+  const signed = (v) => { if (!ok(v)) return '—'; const r = Math.round(v); return r === 0 ? '0' : (r > 0 ? '+' : '−') + Math.abs(r); };
+  const FMT = {
+    B0: (v) => (!ok(v) ? '—' : '$' + d3.format(',.0f')(v) + 'B'), B1: fB1, B2: fB, B3: (v) => (!ok(v) ? '—' : '$' + d3.format('.3f')(v) + 'B'),
+    M: fM, McM: (v) => (!ok(v) ? '—' : fMc(v) + 'M'), x1: fX1, pct: fPct, pct1: fPct1, pct0: (v) => (!ok(v) ? '—' : Math.round(v) + '%'),
+    int: (v) => (!ok(v) ? '—' : d3.format('d')(v)), int0: (v) => (!ok(v) ? '—' : String(Math.round(v))), n1: (v) => (!ok(v) ? '—' : d3.format('.1f')(v)),
+    share: fShare, share1: (v) => (!ok(v) ? '—' : d3.format('.1%')(v)), yoy: (v) => (!ok(v) ? '—' : d3.format('+.0%')(v)), signed,
+    d0: (v) => (!ok(v) ? '—' : '$' + d3.format(',.0f')(v)),
+    d1: (v) => (!ok(v) ? '—' : '$' + d3.format(',.1f')(v)),
+    d2: (v) => (!ok(v) ? '—' : (v < 0 ? '−' : '') + '$' + d3.format('.2f')(Math.abs(v) + 1e-9)),
+    d3: (v) => (!ok(v) ? '—' : '$' + d3.format('.3f')(v)),
+    dm: (v) => (!ok(v) ? '—' : (v < 0 ? '−' : '') + '$' + d3.format(',')(Math.round(Math.abs(v)))),
+    p0: (v) => (!ok(v) ? '—' : String(Math.round(v))),
+    p1: (v) => (!ok(v) ? '—' : d3.format('.1f')(v)),
+    p2: (v) => (!ok(v) ? '—' : d3.format('.2~f')(v)),
+    text: (v) => (v ?? '—'),
+  };
+  const pLabel = (p) => (p === '2H26' ? '2H 2026' : p);
+  const params = () => ({ scenario: dash.params().scenario || 'consensus', period: String(dash.params().period || '2027') });
+
+  const cap = (sel) => sel.style('font-size', 'var(--cds-font-size-caption)');
+  const textW = (svg, s, weight) => {
+    const t = cap(svg.append('text')).style('font-weight', weight || null).text(s);
+    const w = t.node().getComputedTextLength();
+    t.remove();
+    return w;
+  };
+  const styleAxis = (g) => {
+    g.attr('font-size', null).attr('font-family', null);
+    g.selectAll('text').style('fill', 'var(--color-fg-muted)').style('font-size', 'var(--cds-font-size-caption)');
+    g.selectAll('line').style('stroke', 'var(--cds-chart-axis)');
+    g.select('.domain').remove();
+  };
+  const state = (ids) => {
+    const s = ids.map((id) => dash.data(id).status);
+    if (s.every((x) => x === 'ok')) return 'ok';
+    if (s.some((x) => ['error', 'connect', 'declined', 'missing'].includes(x))) return 'error';
+    return 'loading';
+  };
+  const prep = (el, ids) => {
+    const s = state(ids);
+    el.replaceChildren();
+    el.classList.toggle('dash-skeleton', s === 'loading');
+    if (s === 'error') {
+      const f = document.createElement('div');
+      f.className = 'cw-failed';
+      f.textContent = 'Failed to load';
+      el.append(f);
+    }
+    return s === 'ok';
+  };
+
+  // tooltip: lines = [{h}|{sw, name, value, line}]
+  const tip = (el) => {
+    let t = el.querySelector(':scope > .cw-tip');
+    if (!t) { t = document.createElement('div'); t.className = 'cw-tip'; t.hidden = true; el.append(t); }
+    return {
+      show(event, lines) {
+        t.replaceChildren();
+        for (const l of lines) {
+          const row = document.createElement('div');
+          if (l.h) { row.className = 't-h'; row.textContent = l.h; }
+          else {
+            row.className = 't-r';
+            if (l.sw) { const s = document.createElement('span'); s.className = l.line ? 'cw-line-sw' : 'cw-sw'; if (l.line) s.style.borderTopColor = l.sw; else s.style.background = l.sw; row.append(s); }
+            const n = document.createElement('span'); n.textContent = l.name; row.append(n);
+            if (l.value !== undefined) { const v = document.createElement('span'); v.className = 't-v'; v.textContent = l.value; row.append(v); }
+          }
+          t.append(row);
+        }
+        t.hidden = false;
+        const box = el.getBoundingClientRect();
+        const x = event.clientX - box.left, y = event.clientY - box.top;
+        const w = t.offsetWidth, h = t.offsetHeight;
+        let left = x + 14;
+        if (left + w > el.clientWidth) left = Math.max(0, x - w - 14);
+        let top = y - h - 10;
+        if (top < 0) top = Math.min(y + 14, Math.max(0, el.clientHeight - h));
+        t.style.left = left + 'px';
+        t.style.top = top + 'px';
+      },
+      hide() { t.hidden = true; },
+    };
+  };
+
+  // ---- controls ----
+  document.getElementById('scenario-ctl').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-scn]');
+    if (b) dash.setParams({ scenario: b.dataset.scn });
+  });
+  document.getElementById('period-ctl').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-period]');
+    if (b) dash.setParams({ period: b.dataset.period });
+  });
+
+  // ---- simple marks ----
+  const findRow = (data, el) => {
+    if (el.dataset.row !== undefined) return data[Number(el.dataset.row)];
+    const conds = [...new URLSearchParams(el.dataset.where || '')];
+    return data.find((r) => conds.every(([k, v]) => String(r[k]) === v));
+  };
+  const fillMarks = () => {
+    root.querySelectorAll('[data-fmt]').forEach((el) => {
+      const d = dash.data(el.dataset.source);
+      el.classList.toggle('dash-skeleton', d.status === 'loading');
+      if (d.status !== 'ok') { el.textContent = '—'; el.classList.remove('has-val'); return; }
+      const row = findRow(d.data, el);
+      const v = row ? row[el.dataset.field] : null;
+      el.textContent = FMT[el.dataset.fmt](v);
+      el.classList.toggle('has-val', v !== null && v !== undefined);
+    });
+  };
+
+  const drawControls = () => {
+    const { scenario, period } = params();
+    document.querySelectorAll('#scenario-ctl button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scn === scenario)));
+    const ctl = document.getElementById('period-ctl');
+    const cov = dash.data('coverage');
+    ctl.replaceChildren();
+    if (cov.status !== 'ok') return;
+    const periods = [...new Set(cov.data.map((r) => r.period))].sort((a, b) => pkey(a) - pkey(b));
+    for (const p of periods) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.period = p;
+      b.textContent = p;
+      b.setAttribute('aria-pressed', String(p === period));
+      ctl.append(b);
+    }
+  };
+
+  const drawTakeaway = () => {
+    const el = document.getElementById('takeaway');
+    const { scenario } = params();
+    const d = dash.data('summary');
+    el.replaceChildren();
+    el.classList.toggle('dash-skeleton', d.status === 'loading');
+    if (d.status !== 'ok') return;
+    const r = d.data.find((x) => x.scenario === scenario);
+    if (!r) return;
+    const where = 'scenario=' + scenario;
+    const m = (field, text, sfx) => {
+      const s = document.createElement('b');
+      if (sfx) { s.dataset.sfx = sfx; s.classList.add('has-val'); }
+      s.dataset.source = 'summary';
+      s.dataset.field = field;
+      s.dataset.where = where;
+      s.textContent = text;
+      return s;
+    };
+    const t = (s) => document.createTextNode(s);
+    if (r.miss_count > 0) {
+      el.append(t(SCN[scenario] + ': payouts on today’s debt exceed adj. EBITDA in '), m('miss_years', r.miss_years), t(' — '), m('shortfall', '$' + d3.format('.2f')(r.shortfall + 1e-9), 'B'),
+        t(' must be refinanced or raised; the tightest year is '), m('worst_period', r.worst_period), t(' at '), m('worst_dscr', fX(r.worst_dscr)), t(' coverage. '));
+    } else {
+      el.append(t(SCN[scenario] + ': adj. EBITDA covers every year’s payout on today’s debt; the tightest year is '), m('worst_period', r.worst_period), t(' at '), m('worst_dscr', fX(r.worst_dscr)), t('. '));
+    }
+    el.append(m('bullets_2031_33', '$' + d3.format(',.1f')(r.bullets_2031_33), 'B'), t(' of unsecured and convertible bullets land in 2031–33, while the notes already price near a '), m('notes_yield', d3.format('.1f')(r.notes_yield), '%'), t(' yield.'));
+  };
+
+  const drawScenarioMethod = () => {
+    const el = document.getElementById('scenario-method');
+    const { scenario } = params();
+    el.replaceChildren();
+    const mk = (src, where) => {
+      const d = dash.data(src);
+      const s = document.createElement('span');
+      s.dataset.source = src;
+      s.dataset.field = 'method';
+      s.dataset.where = where;
+      const row = d.status === 'ok' ? findRow(d.data, s) : null;
+      s.textContent = row ? row.method : '—';
+      return s;
+    };
+    if (scenario === 'consensus') {
+      el.append(mk('consensus', 'period=2027'), document.createTextNode('. After 2028: '), mk('scenarios_model', 'scenario=consensus&period=2029'), document.createTextNode('.'));
+    } else {
+      el.append(mk('scenarios_model', 'scenario=' + scenario + '&period=2027'), document.createTextNode('.'));
+    }
+  };
+
+  const legend = (el, items) => {
+    el.replaceChildren();
+    for (const it of items) {
+      const s = document.createElement('span');
+      const sw = document.createElement('span');
+      if (it.line) { sw.className = 'cw-line-sw'; sw.style.borderTopColor = it.color; if (it.dashed) sw.style.borderTopStyle = 'dashed'; }
+      else { sw.className = 'cw-sw'; sw.style.background = it.color; if (it.opacity) sw.style.opacity = it.opacity; }
+      s.append(sw, document.createTextNode(it.label));
+      el.append(s);
+    }
+  };
+  const classLegend = () => {
+    const d = dash.data('stack');
+    if (d.status !== 'ok') return [];
+    return d.data.filter((r) => r.class !== 'Equity').map((r) => ({ color: clsColor(r.class), label: r.class + ' · ' + r.class_name }));
+  };
+
+  // ---- stack (CLO tower) ----
+  const drawStack = () => {
+    const el = document.getElementById('stack-chart');
+    if (!prep(el, ['stack'])) return;
+    const rows = dash.data('stack').data;
+    const W = el.clientWidth;
+    const rowH = 56;
+    const H = rows.length * rowH;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+    const towerW = Math.max(52, Math.min(120, W * 0.2));
+    const gapX = Math.max(26, Math.min(60, W * 0.07));
+    const tx = towerW + gapX + 8;
+    const avail = W - tx - 4;
+    const y = d3.scaleLinear([0, 1], [2, H - 2]);
+    const tt = tip(el);
+    rows.forEach((r, i) => {
+      const y0 = y(1 - r.detach);
+      const y1 = y(1 - r.attach);
+      const ym = (y0 + y1) / 2;
+      const yl = i * rowH + rowH / 2;
+      const g = svg.append('g').attr('class', 'cw-hit');
+      g.append('rect').attr('x', 0).attr('y', y0).attr('width', towerW).attr('height', Math.max(1.5, y1 - y0 - 1.5)).attr('rx', 3).style('fill', clsColor(r.class));
+      g.append('path').attr('d', `M${towerW + 2},${ym} C${towerW + gapX / 2},${ym} ${towerW + gapX / 2},${yl} ${towerW + gapX},${yl}`)
+        .style('fill', 'none').style('stroke', clsColor(r.class)).style('stroke-width', 1.5);
+      g.append('circle').attr('cx', towerW + gapX).attr('cy', yl).attr('r', 3).style('fill', clsColor(r.class));
+      const title = r.class === 'Equity' ? r.class_name : r.class + ' · ' + r.class_name;
+      const t1 = cap(g.append('text')).attr('x', tx).attr('y', yl - 4).style('fill', 'var(--color-fg)').style('font-weight', 'var(--cds-font-weight-medium)').text(title);
+      const variants = r.class === 'Equity'
+        ? [`${fB1(r.principal)} · ${fShare(r.share)} of capital · first loss`, `${fB1(r.principal)} · ${fShare(r.share)} of capital`, fB1(r.principal)]
+        : [`${fB(r.principal)} · ${fPct1(r.yield_pct)} avg yield · ${fShare(r.attach)} cushion`, `${fB(r.principal)} · ${fPct1(r.yield_pct)} · ${fShare(r.attach)} cushion`, `${fB(r.principal)} · ${fShare(r.attach)} cushion`, fB(r.principal)];
+      const t2 = cap(g.append('text')).attr('x', tx).attr('y', yl + 12).style('fill', 'var(--color-fg-muted)');
+      for (const v of variants) { t2.text(v); if (t2.node().getComputedTextLength() <= avail) break; }
+      if (t1.node().getComputedTextLength() > avail) t1.text(r.class === 'Equity' ? 'Equity' : r.class + ' · ' + r.class_name.split(':')[0].split(' ').slice(0, 2).join(' '));
+      g.on('pointermove', (event) => tt.show(event, [
+        { h: title },
+        { name: 'Principal', value: fB(r.principal) },
+        { name: 'Share of capital', value: fShare(r.share) },
+        { name: 'Attach – detach', value: `${fShare(r.attach)} – ${fShare(r.detach)}` },
+        ...(r.class === 'Equity' ? [] : [{ name: 'Avg yield', value: fPct(r.yield_pct) }, { name: 'Instruments', value: String(r.instruments) }, { name: 'Ratings', value: r.ratings }]),
+      ])).on('pointerleave', () => tt.hide());
+    });
+  };
+
+  // ---- yield curve ----
+  const drawCurve = () => {
+    const el = document.getElementById('curve-chart');
+    legend(document.getElementById('curve-legend'), classLegend());
+    if (!prep(el, ['instruments', 'market'])) return;
+    const rows = dash.data('instruments').data.map((r) => ({ ...r, date: new Date(r.maturity + '-15T00:00:00Z'), p: Number(r.principal_pf), yv: Number(r.yield_pct) }));
+    const sofr = Number(dash.data('market').data.find((r) => r.key === 'sofr').value);
+    const W = el.clientWidth;
+    const H = 330;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+    const y = d3.scaleLinear([0, d3.max(rows, (r) => r.yv) * 1.12], [H - 26, 14]).nice();
+    const ticks = y.ticks(5);
+    const ml = d3.max(ticks, (t) => textW(svg, t + '%')) + 10;
+    const rmax = Math.max(8, Math.min(20, W / 28));
+    const x = d3.scaleUtc([new Date('2026-07-01'), new Date('2034-01-01')], [ml + rmax, W - rmax - 4]);
+    const r = d3.scaleSqrt([0, d3.max(rows, (d) => d.p)], [0, rmax]);
+    svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', ml).attr('x2', W).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').attr('transform', `translate(${ml},0)`).call(d3.axisLeft(y).tickValues(ticks).tickSize(0).tickPadding(8).tickFormat((d) => d + '%')).call(styleAxis);
+    const xa = svg.append('g').attr('transform', `translate(0,${H - 26})`).call(d3.axisBottom(x).ticks(d3.utcYear.every(W < 460 ? 2 : 1)).tickSize(4).tickFormat(d3.utcFormat('%Y'))).call(styleAxis);
+    xa.selectAll('line').style('stroke', 'var(--cds-chart-axis)');
+    svg.append('line').attr('x1', ml).attr('x2', W).attr('y1', y(sofr)).attr('y2', y(sofr)).style('stroke', 'var(--cds-chart-reference)').style('stroke-dasharray', '4 3');
+    cap(svg.append('text')).attr('x', W - 4).attr('y', y(sofr) - 5).attr('text-anchor', 'end').style('fill', 'var(--color-fg-muted)').text('SOFR ' + fPct(sofr));
+    const tt = tip(el);
+    svg.append('g').selectAll('circle').data(rows.sort((a, b) => b.p - a.p)).join('circle')
+      .attr('cx', (d) => x(d.date)).attr('cy', (d) => y(d.yv)).attr('r', (d) => Math.max(3, r(d.p)))
+      .style('fill', (d) => clsColor(d.class)).style('fill-opacity', 0.72).style('stroke', (d) => clsColor(d.class)).style('stroke-width', 1.5)
+      .on('pointermove', (event, d) => tt.show(event, [
+        { h: d.class + ' · ' + d.instrument },
+        { sw: clsColor(d.class), name: d.yield_basis, value: fPct(d.yv) },
+        { name: 'Principal', value: fB(d.p) },
+        { name: 'Coupon', value: d.coupon },
+        ...(d.price !== null ? [{ name: 'Price', value: d3.format('.2f')(d.price) }] : []),
+        { name: 'Maturity', value: d3.utcFormat('%b %Y')(d.date) },
+        { name: 'Rating', value: d.rating },
+      ]))
+      .on('pointerleave', () => tt.hide());
+  };
+
+  // ---- payout wall ----
+  const drawWall = () => {
+    const el = document.getElementById('wall-chart');
+    legend(document.getElementById('wall-legend'), [...classLegend(), { color: CASH(), label: 'Adj. EBITDA (dashed: held flat)', line: true }, { color: CRIT, label: 'Not covered by EBITDA', opacity: 0.35 }]);
+    if (!prep(el, ['wall', 'coverage'])) return;
+    const { scenario, period } = params();
+    const wall = dash.data('wall').data;
+    const cov = dash.data('coverage').data.filter((r) => r.scenario === scenario);
+    const periods = [...new Set(wall.map((r) => r.period))].sort((a, b) => pkey(a) - pkey(b));
+    const rows = periods.map((p) => {
+      const o = { period: p };
+      for (const c of CLASSES) { const w = wall.find((r) => r.period === p && r.class === c); o[c] = w ? w.debt_service : 0; o[c + '_p'] = w ? w.principal : 0; o[c + '_i'] = w ? w.interest : 0; }
+      o.total = d3.sum(CLASSES, (c) => o[c]);
+      o.cov = cov.find((r) => r.period === p);
+      return o;
+    });
+    const series = d3.stack().keys(CLASSES)(rows);
+    const W = el.clientWidth;
+    const H = 310;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+    const ymax = d3.max([...rows.map((o) => o.total), ...cov.map((r) => r.ebitda)]);
+    const y = d3.scaleLinear([0, ymax * 1.1], [H - 26, 18]).nice();
+    const ticks = y.ticks(5);
+    const ml = d3.max(ticks, (t) => textW(svg, '$' + t + 'B')) + 10;
+    const x = d3.scaleBand(periods, [ml, W - 4]).paddingInner(0.3).paddingOuter(0.15);
+    svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', ml).attr('x2', W).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').attr('transform', `translate(${ml},0)`).call(d3.axisLeft(y).tickValues(ticks).tickSize(0).tickPadding(8).tickFormat((d) => '$' + d + 'B')).call(styleAxis);
+    const wEvery = Math.max(1, Math.ceil((d3.max(periods, (p) => textW(svg, p)) + 8) / x.step()));
+    svg.append('g').attr('transform', `translate(0,${H - 26})`).call(d3.axisBottom(x).tickValues(periods.filter((p, i) => i % wEvery === 0)).tickSize(0).tickPadding(8)).call(styleAxis);
+    const bw = x.bandwidth();
+    for (const s of series) {
+      svg.append('g').selectAll('rect').data(s.filter((d) => d[1] - d[0] > 0.0005)).join('rect')
+        .attr('x', (d) => x(d.data.period)).attr('width', bw)
+        .attr('y', (d) => y(d[1])).attr('height', (d) => Math.max(0.5, y(d[0]) - y(d[1]) - 1))
+        .attr('rx', 2).style('fill', clsColor(s.key));
+    }
+    // uncovered portion
+    for (const o of rows) {
+      if (!o.cov || o.cov.ebitda >= o.total) continue;
+      const top = y(o.total), bot = y(Math.max(0, o.cov.ebitda));
+      svg.append('rect').attr('x', x(o.period) - 3).attr('width', bw + 6).attr('y', top - 2).attr('height', bot - top + 2)
+        .attr('rx', 3).style('fill', CRIT).style('fill-opacity', 0.22).style('stroke', CRIT).style('stroke-width', 1.5);
+    }
+    // selected period
+    const sel = rows.find((o) => o.period === period);
+    if (sel) svg.append('rect').attr('x', x(sel.period) - 5).attr('width', bw + 10).attr('y', y(sel.total) - 5).attr('height', y(0) - y(sel.total) + 5).attr('rx', 4)
+      .style('fill', 'none').style('stroke', 'var(--color-fg)').style('stroke-width', 1).style('stroke-dasharray', '3 2');
+    // totals
+    const labels = rows.map((o) => fB(o.total));
+    const lw = d3.max(labels, (s) => textW(svg, s));
+    if (x.step() >= lw + 6) {
+      rows.forEach((o, i) => cap(svg.append('text')).attr('x', x(o.period) + bw / 2).attr('y', y(o.total) - 6).attr('text-anchor', 'middle').style('fill', 'var(--color-fg-muted)').text(labels[i]));
+    }
+    // EBITDA line
+    const pts = rows.filter((o) => o.cov).map((o) => ({ x: x(o.period) + bw / 2, y: y(o.cov.ebitda), ex: o.cov.extrapolated }));
+    const line = d3.line().x((d) => d.x).y((d) => d.y);
+    const lastReal = pts.findLastIndex((d) => !d.ex);
+    const solid = pts.slice(0, lastReal + 1);
+    const dashed = lastReal >= 0 ? pts.slice(lastReal) : pts;
+    svg.append('path').attr('d', line(solid)).style('fill', 'none').style('stroke', CASH()).style('stroke-width', 2).style('stroke-linecap', 'round').style('stroke-linejoin', 'round');
+    if (dashed.length > 1 && dashed.some((d) => d.ex)) svg.append('path').attr('d', line(dashed)).style('fill', 'none').style('stroke', CASH()).style('stroke-width', 2).style('stroke-dasharray', '5 4');
+    svg.append('g').selectAll('circle').data(pts).join('circle').attr('cx', (d) => d.x).attr('cy', (d) => d.y).attr('r', 3.5).style('fill', 'var(--color-panel)').style('stroke', CASH()).style('stroke-width', 2);
+    // hover + click
+    const tt = tip(el);
+    svg.append('g').selectAll('rect').data(rows).join('rect').attr('class', 'cw-hit')
+      .attr('x', (o) => x(o.period) - (x.step() - bw) / 2).attr('width', x.step()).attr('y', 0).attr('height', H - 26).style('fill', 'transparent')
+      .on('pointermove', (event, o) => tt.show(event, [
+        { h: pLabel(o.period) + ' · ' + SCN[scenario] },
+        ...CLASSES.slice().reverse().filter((c) => o[c] > 0.0005).map((c) => ({ sw: clsColor(c), name: `${c} · int ${fB(o[c + '_i'])} + prin ${fB(o[c + '_p'])}`, value: fB(o[c]) })),
+        { name: 'Total payout', value: fB(o.total) },
+        ...(o.cov ? [{ sw: CASH(), line: true, name: 'Adj. EBITDA' + (o.cov.extrapolated ? ' (held flat)' : ''), value: fB(o.cov.ebitda) }, { name: 'Coverage', value: fX(o.cov.dscr) }] : []),
+      ]))
+      .on('pointerleave', () => tt.hide())
+      .on('click', (event, o) => dash.setParams({ period: o.period }));
+  };
+
+  // ---- DSCR lines ----
+  const drawDscr = () => {
+    const el = document.getElementById('dscr-chart');
+    if (!prep(el, ['coverage'])) return;
+    const { scenario } = params();
+    const cov = dash.data('coverage').data;
+    const periods = [...new Set(cov.map((r) => r.period))].sort((a, b) => pkey(a) - pkey(b));
+    const W = el.clientWidth;
+    const H = 270;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+    const scns = ['consensus', 'runoff', 'stress'];
+    const lines = scns.map((s) => ({ s, pts: periods.map((p) => cov.find((r) => r.scenario === s && r.period === p)).filter(Boolean) }));
+    const y = d3.scaleLinear([0, Math.max(1.5, d3.max(cov, (r) => r.dscr ?? 0) * 1.08)], [H - 26, 12]).nice();
+    const ticks = y.ticks(5);
+    const ml = d3.max(ticks, (t) => textW(svg, t + 'x')) + 10;
+    const ends = lines.map((l) => {
+      const last = l.pts[l.pts.length - 1];
+      return { s: l.s, text: SCN[l.s] + ' ' + fX1(last.dscr), v: last.dscr ?? 0 };
+    });
+    const mr = d3.max(ends, (e) => textW(svg, e.text, 'var(--cds-font-weight-medium)')) + 12;
+    const x = d3.scalePoint(periods, [ml + 8, W - mr]);
+    svg.append('rect').attr('x', ml).attr('width', W - mr - ml + 4).attr('y', y(1)).attr('height', y(0) - y(1)).style('fill', CRIT).style('fill-opacity', 0.07);
+    svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', ml).attr('x2', W - mr + 4).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--cds-chart-grid)');
+    svg.append('line').attr('x1', ml).attr('x2', W - mr + 4).attr('y1', y(1)).attr('y2', y(1)).style('stroke', CRIT).style('stroke-dasharray', '4 3');
+    svg.append('g').attr('transform', `translate(${ml},0)`).call(d3.axisLeft(y).tickValues(ticks).tickSize(0).tickPadding(8).tickFormat((d) => d + 'x')).call(styleAxis);
+    const pstep = periods.length > 1 ? x(periods[1]) - x(periods[0]) : W;
+    const every = Math.max(1, Math.ceil((d3.max(periods, (p) => textW(svg, p)) + 8) / pstep));
+    svg.append('g').attr('transform', `translate(0,${H - 26})`).call(d3.axisBottom(x).tickValues(periods.filter((p, i) => i % every === 0)).tickSize(0).tickPadding(8)).call(styleAxis);
+    const line = d3.line().x((d) => x(d.period)).y((d) => y(d.dscr ?? 0));
+    const color = (s) => (s === scenario ? 'var(--color-fg)' : 'var(--cds-chart-muted)');
+    for (const l of [...lines].sort((a, b) => (a.s === scenario) - (b.s === scenario))) {
+      const real = l.pts.filter((d) => !d.extrapolated);
+      const ext = l.pts.filter((d, i, a) => d.extrapolated || (a[i + 1] && a[i + 1].extrapolated));
+      const sw = l.s === scenario ? 2.5 : 1.5;
+      svg.append('path').attr('d', line(real)).style('fill', 'none').style('stroke', color(l.s)).style('stroke-width', sw).style('stroke-linecap', 'round').style('stroke-linejoin', 'round');
+      if (ext.length > 1) svg.append('path').attr('d', line(ext)).style('fill', 'none').style('stroke', color(l.s)).style('stroke-width', sw).style('stroke-dasharray', '5 4');
+      if (l.s === scenario) svg.append('g').selectAll('circle').data(l.pts).join('circle').attr('cx', (d) => x(d.period)).attr('cy', (d) => y(d.dscr ?? 0)).attr('r', 3.5)
+        .style('fill', (d) => ((d.dscr ?? 0) < 1 ? CRIT : 'var(--color-panel)')).style('stroke', (d) => ((d.dscr ?? 0) < 1 ? CRIT : 'var(--color-fg)')).style('stroke-width', 2);
+    }
+    // end labels, spread apart
+    const placed = ends.map((e) => ({ ...e, y: y(e.v) })).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < placed.length; i++) if (placed[i].y - placed[i - 1].y < 14) placed[i].y = placed[i - 1].y + 14;
+    const overflow = placed[placed.length - 1].y - (H - 30);
+    if (overflow > 0) placed.forEach((p) => { p.y -= overflow; });
+    for (const p of placed) {
+      cap(svg.append('text')).attr('x', W - mr + 8).attr('y', p.y + 4).style('fill', p.s === scenario ? 'var(--color-fg)' : 'var(--color-fg-muted)')
+        .style('font-weight', p.s === scenario ? 'var(--cds-font-weight-medium)' : null).text(p.text);
+    }
+    const tt = tip(el);
+    const step = periods.length > 1 ? x(periods[1]) - x(periods[0]) : W;
+    svg.append('g').selectAll('rect').data(periods).join('rect').attr('class', 'cw-hit')
+      .attr('x', (p) => x(p) - step / 2).attr('width', step).attr('y', 0).attr('height', H - 26).style('fill', 'transparent')
+      .on('pointermove', (event, p) => tt.show(event, [
+        { h: pLabel(p) + ' · coverage' },
+        ...scns.map((s) => { const r = cov.find((d) => d.scenario === s && d.period === p); return { sw: color(s), line: true, name: `${SCN[s]} (EBITDA ${fB(r?.ebitda)})`, value: fX(r?.dscr) }; }),
+      ]))
+      .on('pointerleave', () => tt.hide())
+      .on('click', (event, p) => dash.setParams({ period: p }));
+  };
+
+  // ---- funding gap ----
+  const drawFunding = () => {
+    const el = document.getElementById('funding-chart');
+    const OWN = CASH();
+    legend(document.getElementById('funding-legend'), [
+      { color: OWN, label: 'Paid from operating cash flow' },
+      { color: CRIT, label: 'Must raise: new loans, bonds or shares' },
+      { color: 'var(--color-fg-muted)', label: 'Total debt today', line: true, dashed: true },
+    ]);
+    if (!prep(el, ['funding', 'funding_sum'])) return;
+    const rows = dash.data('funding').data.slice().sort((a, b) => pkey(a.period) - pkey(b.period));
+    const debt = dash.data('funding_sum').data[0].debt_pf;
+    const max = Math.max(d3.max(rows, (r) => Math.max(r.uses, r.cfo)), debt) * 1.04;
+    const pct = (v) => (Math.max(0, v) / max) * 100 + '%';
+    const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+    const wrap = mk('div', 'fd-rows');
+    // reference label row
+    const axis = mk('div', 'fd-axis');
+    const lab = mk('div', 'fd-reflab');
+    const ls = mk('span', null, 'Total debt today ' + fB1(debt));
+    ls.style.left = pct(debt);
+    ls.style.transform = debt / max > 0.55 ? 'translateX(calc(-100% - 4px))' : 'translateX(4px)';
+    lab.append(ls);
+    axis.append(mk('div'), lab);
+    wrap.append(axis);
+    const tt = tip(el);
+    for (const r of rows) {
+      const row = mk('div', 'fd-row');
+      const label = mk('div', 'fd-label');
+      label.append(mk('b', null, r.period === '2H26' ? '2H 2026' : r.period), mk('span', null, r.period === '2H26' ? '6 months' : 'full year'));
+      const body = mk('div', 'fd-body');
+      const track = mk('div', 'fd-track');
+      const own = mk('span', 'fd-seg');
+      own.style.width = pct(Math.min(r.cfo, r.uses));
+      own.style.background = OWN;
+      track.append(own);
+      if (r.gap > 0) {
+        const raise = mk('span', 'fd-seg');
+        raise.style.width = pct(r.gap);
+        raise.style.background = CRIT;
+        track.append(raise);
+      }
+      const ref = mk('span', 'fd-ref');
+      ref.style.left = pct(debt);
+      track.append(ref);
+      const cap1 = mk('div', 'fd-cap');
+      const sw1 = mk('span', 'cw-sw'); sw1.style.background = OWN;
+      const sw2 = mk('span', 'cw-sw'); sw2.style.background = CRIT;
+      cap1.append(sw1, document.createTextNode('Operations ' + fB1(Math.min(r.cfo, r.uses)) + ' (' + fShare(r.self_funded_share) + ')'), mk('span', null, '·'),
+        sw2, mk('b', 'bm-red', 'Raise ' + fB1(Math.max(0, r.gap))));
+      const cap2 = mk('div', 'fd-cap');
+      cap2.append(document.createTextNode('Cash needed '), mk('b', null, fB1(r.uses)), document.createTextNode(' = capex ' + fB1(r.capex) + ' + debt coming due ' + fB1(r.principal)));
+      body.append(track, cap1, cap2);
+      row.append(label, body);
+      row.addEventListener('pointermove', (event) => tt.show(event, [
+        { h: pLabel(r.period) + ' · consensus plan' },
+        { name: 'Capex', value: fB(r.capex) },
+        { name: 'Debt coming due (today’s debt)', value: fB(r.principal) },
+        { name: 'Cash needed', value: fB(r.uses) },
+        { sw: OWN, name: 'Operating cash flow', value: fB(r.cfo) },
+        { sw: CRIT, name: 'Must raise', value: fB(r.gap) },
+      ]));
+      row.addEventListener('pointerleave', () => tt.hide());
+      wrap.append(row);
+    }
+    el.append(wrap);
+  };
+
+  // ---- waterfall ----
+  const drawWaterfall = () => {
+    const el = document.getElementById('waterfall-chart');
+    const { scenario, period } = params();
+    document.getElementById('waterfall-title').textContent = `Where ${pLabel(period)} adj. EBITDA goes · ${SCN[scenario]}`;
+    if (!prep(el, ['waterfall'])) return;
+    const steps = dash.data('waterfall').data.filter((r) => r.scenario === scenario && r.period === period).sort((a, b) => a.step - b.step);
+    if (!steps.length) return;
+    const ebitda = steps[0].cash_before;
+    const last = steps[steps.length - 1];
+    const residual = last.cash_after;
+    const label = (r) => (r.part === 'all' ? `${r.class} · SPV debt service` : r.part === 'interest' ? `${r.class} · ${r.class === 'F' ? 'coupons' : 'interest'}` : `${r.class} · principal`);
+    const items = [{ label: 'Adj. EBITDA', start: 0, end: ebitda, kind: 'ebitda', value: ebitda }];
+    for (const r of steps.slice(0, -1)) items.push({ label: label(r), start: r.cash_after, end: r.cash_before, kind: 'step', r, value: r.due });
+    items.push(residual >= 0
+      ? { label: 'Left for equity & capex', start: 0, end: residual, kind: 'equity', value: residual }
+      : { label: 'Must be refinanced', start: residual, end: 0, kind: 'short', value: residual });
+    const W = el.clientWidth;
+    const rowH = 27;
+    const top = 22;
+    const H = top + items.length * rowH + 26;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+    const ml = d3.max(items, (it) => textW(svg, it.label)) + 12;
+    const mr = d3.max(items, (it) => textW(svg, it.value === 0 ? '—' : fB(it.value))) + 14;
+    const x = d3.scaleLinear([Math.min(0, residual), Math.max(ebitda, 0.01)], [ml + 4, W - mr]).nice();
+    const ticks = x.ticks(W < 480 ? 3 : 5);
+    svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', (d) => x(d)).attr('x2', (d) => x(d)).attr('y1', top - 6).attr('y2', H - 26).style('stroke', 'var(--cds-chart-grid)');
+    if (residual < 0) {
+      svg.append('rect').attr('x', x(residual)).attr('width', x(0) - x(residual)).attr('y', top - 6).attr('height', H - 26 - top + 6).style('fill', CRIT).style('fill-opacity', 0.07);
+      const t = 'Refinance';
+      if (textW(svg, t) < x(0) - x(residual) - 8) cap(svg.append('text')).attr('x', x(0) - 6).attr('y', top - 10).attr('text-anchor', 'end').style('fill', 'var(--color-bad)').text(t);
+    }
+    svg.append('line').attr('x1', x(0)).attr('x2', x(0)).attr('y1', top - 6).attr('y2', H - 26).style('stroke', 'var(--cds-chart-axis)');
+    svg.append('g').attr('transform', `translate(0,${H - 26})`).call(d3.axisBottom(x).tickValues(ticks).tickSize(0).tickPadding(8).tickFormat((d) => (d < 0 ? '−$' + -d : '$' + d) + 'B')).call(styleAxis);
+    const bh = Math.round(rowH * 0.62);
+    const tt = tip(el);
+    items.forEach((it, i) => {
+      const yc = top + i * rowH + rowH / 2;
+      const g = svg.append('g');
+      cap(g.append('text')).attr('x', ml).attr('y', yc + 4).attr('text-anchor', 'end').style('fill', it.kind === 'short' ? 'var(--color-bad)' : 'var(--color-fg)')
+        .style('font-weight', it.kind === 'step' ? null : 'var(--cds-font-weight-medium)').text(it.label);
+      const bar = (a, b, fill, op) => { if (b - a > 1e-6) g.append('rect').attr('x', x(a)).attr('width', Math.max(1, x(b) - x(a))).attr('y', yc - bh / 2).attr('height', bh).attr('rx', 3).style('fill', fill).style('fill-opacity', op ?? 1); };
+      if (it.kind === 'ebitda' || it.kind === 'equity') bar(it.start, it.end, CASH());
+      else if (it.kind === 'short') bar(it.start, it.end, CRIT);
+      else {
+        bar(Math.max(0, it.start), Math.max(0, it.end), clsColor(it.r.class), it.r.part === 'principal' ? 0.6 : 1);
+        bar(Math.min(0, it.start), Math.min(0, it.end), CRIT, 0.85);
+      }
+      if (i < items.length - 1) {
+        const nx = it.kind === 'ebitda' ? it.end : it.start;
+        if (it.kind !== 'equity' && it.kind !== 'short') svg.append('line').attr('x1', x(nx)).attr('x2', x(nx)).attr('y1', yc + bh / 2).attr('y2', yc + rowH - bh / 2).style('stroke', 'var(--cds-chart-reference)').style('stroke-dasharray', '2 2');
+      }
+      cap(g.append('text')).attr('x', W - mr + 10).attr('y', yc + 4).style('fill', it.kind === 'short' ? 'var(--color-bad)' : 'var(--color-fg-muted)')
+        .text(it.value === 0 && it.kind === 'step' ? '—' : fB(it.value));
+      g.append('rect').attr('x', 0).attr('width', W).attr('y', yc - rowH / 2).attr('height', rowH).style('fill', 'transparent')
+        .on('pointermove', (event) => {
+          if (it.kind === 'step') tt.show(event, [
+            { h: it.label + ' · ' + pLabel(period) },
+            { sw: clsColor(it.r.class), name: 'Due', value: fB(it.r.due) },
+            { name: 'Cash before', value: fB(it.r.cash_before) },
+            { name: 'Cash after', value: fB(it.r.cash_after) },
+            { name: 'Refinanced', value: fB(it.r.refinanced) },
+          ]);
+          else tt.show(event, [{ h: it.label + ' · ' + pLabel(period) }, { name: 'Amount', value: fB(it.value) }]);
+        })
+        .on('pointerleave', () => tt.hide());
+    });
+  };
+
+  // ---- debt stack by effective rate ----
+  const drawEffRate = () => {
+    const el = document.getElementById('effrate-chart');
+    if (!prep(el, ['instruments'])) return;
+    const rows = dash.data('instruments').data
+      .filter((r) => r.effective_rate_pct !== null && Number(r.principal_jun26) > 0)
+      .sort((a, b) => b.effective_rate_pct - a.effective_rate_pct || b.principal_jun26 - a.principal_jun26);
+    const max = d3.max(rows, (r) => Number(r.principal_jun26));
+    const span = (cls, text) => { const s = document.createElement('span'); s.className = cls; if (text !== undefined) s.textContent = text; return s; };
+    for (const r of rows) {
+      const hot = r.id === 'n32';
+      const row = document.createElement('div');
+      row.className = 'er-row' + (hot ? ' is-hot' : '');
+      const name = span('er-name');
+      name.append(span('er-n', r.name_10q), span('er-sub', r.maturity_label));
+      const wrap = span('er-barwrap');
+      const bar = span('er-bar');
+      bar.style.width = (Number(r.principal_jun26) / max) * 76 + '%';
+      wrap.append(bar, span('er-val', fMc(r.principal_jun26)));
+      if (hot) wrap.append(span('er-tag', 'The bond in the headlines'));
+      row.append(span('er-rate', Math.round(r.effective_rate_pct) + '%'), name, wrap);
+      el.append(row);
+    }
+  };
+
+  // ---- table ----
+  const MOODYS = ['Aaa', 'Aa1', 'Aa2', 'Aa3', 'A1', 'A2', 'A3', 'Baa1', 'Baa2', 'Baa3', 'Ba1', 'Ba2', 'Ba3', 'B1', 'B2', 'B3', 'Caa1', 'Caa2', 'Caa3', 'Ca', 'C'];
+  const ratingRank = (s) => { const i = MOODYS.indexOf(String(s).split(' ')[0]); return i < 0 ? null : i; };
+  const SORTS = {
+    class: { first: 'asc', val: (r) => Number(r.rank) },
+    instrument: { first: 'asc', val: (r) => r.instrument, text: true },
+    principal_pf: { first: 'desc', val: (r) => Number(r.principal_pf) },
+    rating: { first: 'asc', val: (r) => ratingRank(r.rating) },
+    coupon: { first: 'desc', val: (r) => Number(r.cash_rate_pct) },
+    yield_pct: { first: 'desc', val: (r) => Number(r.yield_pct) },
+    price: { first: 'asc', val: (r) => (r.price === null ? null : Number(r.price)) },
+    maturity: { first: 'asc', val: (r) => r.maturity, text: true },
+    security: { first: 'asc', val: (r) => r.security, text: true },
+  };
+  let tableSort = { key: 'class', dir: 'asc' };
+  const sortRows = (rows) => {
+    const s = SORTS[tableSort.key];
+    const sign = tableSort.dir === 'asc' ? 1 : -1;
+    const seniority = (a, b) => Number(a.rank) - Number(b.rank) || (a.maturity < b.maturity ? -1 : a.maturity > b.maturity ? 1 : 0);
+    return rows.slice().sort((a, b) => {
+      const va = s.val(a);
+      const vb = s.val(b);
+      if (va === null && vb !== null) return 1;
+      if (vb === null && va !== null) return -1;
+      const c = va === null ? 0 : s.text ? String(va).localeCompare(String(vb)) : va - vb;
+      return c !== 0 ? sign * c : seniority(a, b);
+    });
+  };
+  document.querySelector('#tranche-table thead').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-sort]');
+    if (!b) return;
+    const k = b.dataset.sort;
+    tableSort = tableSort.key === k ? { key: k, dir: tableSort.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: SORTS[k].first };
+    drawTable();
+  });
+  const drawTable = () => {
+    const tbody = document.querySelector('#tranche-table tbody');
+    document.querySelectorAll('#tranche-table th').forEach((th) => {
+      const k = th.querySelector('button[data-sort]')?.dataset.sort;
+      th.setAttribute('aria-sort', k === tableSort.key ? (tableSort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+    });
+    const d = dash.data('instruments');
+    tbody.replaceChildren();
+    if (d.status !== 'ok') return;
+    let prev = null;
+    for (const r of sortRows(d.data)) {
+      const tr = document.createElement('tr');
+      tr.dataset.key = r.id;
+      if (tableSort.key === 'class' && prev !== null && prev !== r.class) tr.className = 'cw-first';
+      prev = r.class;
+      const td = (text, cls) => { const c = document.createElement('td'); if (cls) c.className = cls; c.textContent = text; tr.append(c); return c; };
+      const c0 = td(r.class, 'cls');
+      const sw = document.createElement('span');
+      sw.className = 'cw-sw';
+      sw.style.background = clsColor(r.class);
+      c0.prepend(sw);
+      td(r.instrument);
+      td(d3.format('.2f')(Number(r.principal_pf) + 1e-9), 'num');
+      td(r.rating);
+      td(r.coupon, 'cw-hide-narrow');
+      td(fPct(Number(r.yield_pct)), 'num');
+      td(r.price === null ? '—' : d3.format('.2f')(r.price), 'num cw-hide-narrow');
+      td(d3.utcFormat('%b %Y')(new Date(r.maturity + '-15T00:00:00Z')));
+      td(r.security, 'cw-hide-narrow');
+      tbody.append(tr);
+    }
+  };
+
+  dash.onData(() => {
+    drawControls();
+    fillMarks();
+    drawTakeaway();
+    drawScenarioMethod();
+    drawStack();
+    drawCurve();
+    drawWall();
+    drawDscr();
+    drawEffRate();
+    drawFunding();
+    drawWaterfall();
+    drawTable();
+  });
+})();
+</script>

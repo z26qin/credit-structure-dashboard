@@ -1,0 +1,14 @@
+{
+  "description": "Principal due by year on debt outstanding at Jun 30, 2026, as reported in CoreWeave's Q2 2026 10-Q.",
+  "fixed": true,
+  "source": {
+    "kind": "file",
+    "name": "crwv_10q_maturities.json",
+    "url": "/_blob/ef0eb96a5e041a65a1d4b343c6236ac1"
+  },
+  "title": "10-Q principal schedule",
+  "updated": {
+    "at": "2026-10-20T14:11:19Z",
+    "by": "Claude"
+  }
+}

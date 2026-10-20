@@ -1,0 +1,14 @@
+{
+  "description": "Inputs taken from the user's business-model chart: Goldman Sachs single-project model (Oct 19, 2026), contract terms, the 90-day cancellation point, and illustrative cost-of-capital and discount-rate thresholds. Not independently verified.",
+  "fixed": true,
+  "source": {
+    "kind": "file",
+    "name": "crwv_business_model.json",
+    "url": "/_blob/32f089598904b575560f5746046d649a"
+  },
+  "title": "Business-model inputs",
+  "updated": {
+    "at": "2026-10-20T14:41:37Z",
+    "by": "Claude"
+  }
+}

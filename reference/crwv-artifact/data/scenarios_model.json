@@ -1,0 +1,144 @@
+[
+ {
+  "period": "2H26",
+  "scenario": "runoff",
+  "revenue": 8.2,
+  "ebitda": 4.756,
+  "method": "Backlog (RPO) run-off at 58% EBITDA margin; no new contracts"
+ },
+ {
+  "period": "2H26",
+  "scenario": "stress",
+  "revenue": 7.38,
+  "ebitda": 4.28,
+  "method": "Run-off with 30% of backlog lost (top-customer shock) and 50% margin from 2027; 10% revenue haircut in 2H26"
+ },
+ {
+  "period": "2027",
+  "scenario": "runoff",
+  "revenue": 22.878,
+  "ebitda": 13.269,
+  "method": "Backlog (RPO) run-off at 58% EBITDA margin; no new contracts"
+ },
+ {
+  "period": "2027",
+  "scenario": "stress",
+  "revenue": 16.015,
+  "ebitda": 8.007,
+  "method": "Run-off with 30% of backlog lost (top-customer shock) and 50% margin from 2027; 10% revenue haircut in 2H26"
+ },
+ {
+  "period": "2028",
+  "scenario": "runoff",
+  "revenue": 21.55,
+  "ebitda": 12.499,
+  "method": "Backlog (RPO) run-off at 58% EBITDA margin; no new contracts"
+ },
+ {
+  "period": "2028",
+  "scenario": "stress",
+  "revenue": 15.085,
+  "ebitda": 7.542,
+  "method": "Run-off with 30% of backlog lost (top-customer shock) and 50% margin from 2027; 10% revenue haircut in 2H26"
+ },
+ {
+  "period": "2029",
+  "scenario": "consensus",
+  "ebitda": 28.681,
+  "method": "Held flat at 2028E (no consensus past 2028)"
+ },
+ {
+  "period": "2029",
+  "scenario": "runoff",
+  "revenue": 20.222,
+  "ebitda": 11.728,
+  "method": "Backlog (RPO) run-off at 58% EBITDA margin; no new contracts"
+ },
+ {
+  "period": "2029",
+  "scenario": "stress",
+  "revenue": 14.155,
+  "ebitda": 7.078,
+  "method": "Run-off with 30% of backlog lost (top-customer shock) and 50% margin from 2027; 10% revenue haircut in 2H26"
+ },
+ {
+  "period": "2030",
+  "scenario": "consensus",
+  "ebitda": 28.681,
+  "method": "Held flat at 2028E (no consensus past 2028)"
+ },
+ {
+  "period": "2030",
+  "scenario": "runoff",
+  "revenue": 14.259,
+  "ebitda": 8.27,
+  "method": "Backlog (RPO) run-off at 58% EBITDA margin; no new contracts"
+ },
+ {
+  "period": "2030",
+  "scenario": "stress",
+  "revenue": 9.981,
+  "ebitda": 4.991,
+  "method": "Run-off with 30% of backlog lost (top-customer shock) and 50% margin from 2027; 10% revenue haircut in 2H26"
+ },
+ {
+  "period": "2031",
+  "scenario": "consensus",
+  "ebitda": 28.681,
+  "method": "Held flat at 2028E (no consensus past 2028)"
+ },
+ {
+  "period": "2031",
+  "scenario": "runoff",
+  "revenue": 8.296,
+  "ebitda": 4.812,
+  "method": "Backlog (RPO) run-off at 58% EBITDA margin; no new contracts"
+ },
+ {
+  "period": "2031",
+  "scenario": "stress",
+  "revenue": 5.807,
+  "ebitda": 2.904,
+  "method": "Run-off with 30% of backlog lost (top-customer shock) and 50% margin from 2027; 10% revenue haircut in 2H26"
+ },
+ {
+  "period": "2032",
+  "scenario": "consensus",
+  "ebitda": 28.681,
+  "method": "Held flat at 2028E (no consensus past 2028)"
+ },
+ {
+  "period": "2032",
+  "scenario": "runoff",
+  "revenue": 8.296,
+  "ebitda": 4.812,
+  "method": "Backlog (RPO) run-off at 58% EBITDA margin; no new contracts"
+ },
+ {
+  "period": "2032",
+  "scenario": "stress",
+  "revenue": 5.807,
+  "ebitda": 2.904,
+  "method": "Run-off with 30% of backlog lost (top-customer shock) and 50% margin from 2027; 10% revenue haircut in 2H26"
+ },
+ {
+  "period": "2033",
+  "scenario": "consensus",
+  "ebitda": 28.681,
+  "method": "Held flat at 2028E (no consensus past 2028)"
+ },
+ {
+  "period": "2033",
+  "scenario": "runoff",
+  "revenue": 0.0,
+  "ebitda": 0.0,
+  "method": "Backlog (RPO) run-off at 58% EBITDA margin; no new contracts"
+ },
+ {
+  "period": "2033",
+  "scenario": "stress",
+  "revenue": 0.0,
+  "ebitda": 0.0,
+  "method": "Run-off with 30% of backlog lost (top-customer shock) and 50% margin from 2027; 10% revenue haircut in 2H26"
+ }
+]

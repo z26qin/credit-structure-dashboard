@@ -1,0 +1,14 @@
+{
+  "description": "Q2 2026 results and Q3 guidance, Q2 2025 revenue, Jun 30 10-Q balances and weighted average effective rate, lease commitments, backlog, equity market cap (Oct 16, 2026), SOFR (Oct 19, 2026) and the unsecured notes' yield-to-worst range (BondTerminal, Oct 19, 2026).",
+  "fixed": true,
+  "source": {
+    "kind": "file",
+    "name": "crwv_market.json",
+    "url": "/_blob/8481f86a5208471d5e5aa8d3051ff422"
+  },
+  "title": "CRWV results & market facts",
+  "updated": {
+    "at": "2026-10-20T14:39:42Z",
+    "by": "Claude"
+  }
+}

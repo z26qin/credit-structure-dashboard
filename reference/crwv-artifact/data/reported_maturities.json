@@ -1,0 +1,26 @@
+[
+ {
+  "period": "2H26",
+  "principal": 4.4
+ },
+ {
+  "period": "2027",
+  "principal": 6.2
+ },
+ {
+  "period": "2028",
+  "principal": 4.4
+ },
+ {
+  "period": "2029",
+  "principal": 2.4
+ },
+ {
+  "period": "2030",
+  "principal": 3.2
+ },
+ {
+  "period": "thereafter",
+  "principal": 14.9
+ }
+]

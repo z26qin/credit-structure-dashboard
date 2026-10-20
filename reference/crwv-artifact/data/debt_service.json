@@ -1,0 +1,638 @@
+[
+ {
+  "instrument": "ddtl4",
+  "period": "2H26",
+  "principal": 0.161,
+  "interest": 0.083
+ },
+ {
+  "instrument": "ddtl4",
+  "period": "2027",
+  "principal": 0.758,
+  "interest": 0.139
+ },
+ {
+  "instrument": "ddtl4",
+  "period": "2028",
+  "principal": 0.821,
+  "interest": 0.092
+ },
+ {
+  "instrument": "ddtl4",
+  "period": "2029",
+  "principal": 0.507,
+  "interest": 0.052
+ },
+ {
+  "instrument": "ddtl4",
+  "period": "2030",
+  "principal": 0.373,
+  "interest": 0.025
+ },
+ {
+  "instrument": "ddtl4",
+  "period": "2031",
+  "principal": 0.132,
+  "interest": 0.009
+ },
+ {
+  "instrument": "ddtl4",
+  "period": "2032",
+  "principal": 0.085,
+  "interest": 0.001
+ },
+ {
+  "instrument": "ddtl21",
+  "period": "2H26",
+  "principal": 0.584,
+  "interest": 0.112
+ },
+ {
+  "instrument": "ddtl21",
+  "period": "2027",
+  "principal": 0.964,
+  "interest": 0.16
+ },
+ {
+  "instrument": "ddtl21",
+  "period": "2028",
+  "principal": 0.805,
+  "interest": 0.088
+ },
+ {
+  "instrument": "ddtl21",
+  "period": "2029",
+  "principal": 0.419,
+  "interest": 0.037
+ },
+ {
+  "instrument": "ddtl21",
+  "period": "2030",
+  "principal": 0.188,
+  "interest": 0.012
+ },
+ {
+  "instrument": "ddtl21",
+  "period": "2031",
+  "principal": 0.04,
+  "interest": 0.001
+ },
+ {
+  "instrument": "ddtl3",
+  "period": "2H26",
+  "principal": 0.435,
+  "interest": 0.08
+ },
+ {
+  "instrument": "ddtl3",
+  "period": "2027",
+  "principal": 0.666,
+  "interest": 0.116
+ },
+ {
+  "instrument": "ddtl3",
+  "period": "2028",
+  "principal": 0.576,
+  "interest": 0.067
+ },
+ {
+  "instrument": "ddtl3",
+  "period": "2029",
+  "principal": 0.342,
+  "interest": 0.03
+ },
+ {
+  "instrument": "ddtl3",
+  "period": "2030",
+  "principal": 0.196,
+  "interest": 0.006
+ },
+ {
+  "instrument": "ddtl5",
+  "period": "2H26",
+  "principal": 0.099,
+  "interest": 0.044
+ },
+ {
+  "instrument": "ddtl5",
+  "period": "2027",
+  "principal": 0.349,
+  "interest": 0.071
+ },
+ {
+  "instrument": "ddtl5",
+  "period": "2028",
+  "principal": 0.302,
+  "interest": 0.043
+ },
+ {
+  "instrument": "ddtl5",
+  "period": "2029",
+  "principal": 0.187,
+  "interest": 0.022
+ },
+ {
+  "instrument": "ddtl5",
+  "period": "2030",
+  "principal": 0.137,
+  "interest": 0.008
+ },
+ {
+  "instrument": "ddtl5",
+  "period": "2031",
+  "principal": 0.027,
+  "interest": 0.001
+ },
+ {
+  "instrument": "ddtl55",
+  "period": "2H26",
+  "principal": 0.0,
+  "interest": 0.037
+ },
+ {
+  "instrument": "ddtl55",
+  "period": "2027",
+  "principal": 0.264,
+  "interest": 0.101
+ },
+ {
+  "instrument": "ddtl55",
+  "period": "2028",
+  "principal": 0.288,
+  "interest": 0.075
+ },
+ {
+  "instrument": "ddtl55",
+  "period": "2029",
+  "principal": 0.264,
+  "interest": 0.049
+ },
+ {
+  "instrument": "ddtl55",
+  "period": "2030",
+  "principal": 0.24,
+  "interest": 0.026
+ },
+ {
+  "instrument": "ddtl55",
+  "period": "2031",
+  "principal": 0.144,
+  "interest": 0.006
+ },
+ {
+  "instrument": "ddtl1",
+  "period": "2H26",
+  "principal": 0.503,
+  "interest": 0.074
+ },
+ {
+  "instrument": "ddtl1",
+  "period": "2027",
+  "principal": 0.592,
+  "interest": 0.071
+ },
+ {
+  "instrument": "ddtl1",
+  "period": "2028",
+  "principal": 0.205,
+  "interest": 0.005
+ },
+ {
+  "instrument": "ddtl2",
+  "period": "2H26",
+  "principal": 0.748,
+  "interest": 0.149
+ },
+ {
+  "instrument": "ddtl2",
+  "period": "2027",
+  "principal": 1.057,
+  "interest": 0.203
+ },
+ {
+  "instrument": "ddtl2",
+  "period": "2028",
+  "principal": 0.763,
+  "interest": 0.107
+ },
+ {
+  "instrument": "ddtl2",
+  "period": "2029",
+  "principal": 0.429,
+  "interest": 0.044
+ },
+ {
+  "instrument": "ddtl2",
+  "period": "2030",
+  "principal": 0.193,
+  "interest": 0.007
+ },
+ {
+  "instrument": "rcf",
+  "period": "2H26",
+  "principal": 0.0,
+  "interest": 0.028
+ },
+ {
+  "instrument": "rcf",
+  "period": "2027",
+  "principal": 0.0,
+  "interest": 0.067
+ },
+ {
+  "instrument": "rcf",
+  "period": "2028",
+  "principal": 0.0,
+  "interest": 0.067
+ },
+ {
+  "instrument": "rcf",
+  "period": "2029",
+  "principal": 1.2,
+  "interest": 0.062
+ },
+ {
+  "instrument": "oem",
+  "period": "2H26",
+  "principal": 1.492,
+  "interest": 0.198
+ },
+ {
+  "instrument": "oem",
+  "period": "2027",
+  "principal": 1.476,
+  "interest": 0.226
+ },
+ {
+  "instrument": "oem",
+  "period": "2028",
+  "principal": 0.803,
+  "interest": 0.097
+ },
+ {
+  "instrument": "oem",
+  "period": "2029",
+  "principal": 0.333,
+  "interest": 0.033
+ },
+ {
+  "instrument": "oem",
+  "period": "2030",
+  "principal": 0.115,
+  "interest": 0.004
+ },
+ {
+  "instrument": "oemsub",
+  "period": "2H26",
+  "principal": 0.391,
+  "interest": 0.032
+ },
+ {
+  "instrument": "oemsub",
+  "period": "2027",
+  "principal": 0.355,
+  "interest": 0.03
+ },
+ {
+  "instrument": "oemsub",
+  "period": "2028",
+  "principal": 0.137,
+  "interest": 0.005
+ },
+ {
+  "instrument": "n30",
+  "period": "2H26",
+  "principal": 0.0,
+  "interest": 0.092
+ },
+ {
+  "instrument": "n30",
+  "period": "2027",
+  "principal": 0.0,
+  "interest": 0.185
+ },
+ {
+  "instrument": "n30",
+  "period": "2028",
+  "principal": 0.0,
+  "interest": 0.185
+ },
+ {
+  "instrument": "n30",
+  "period": "2029",
+  "principal": 0.0,
+  "interest": 0.185
+ },
+ {
+  "instrument": "n30",
+  "period": "2030",
+  "principal": 2.0,
+  "interest": 0.092
+ },
+ {
+  "instrument": "n31a",
+  "period": "2H26",
+  "principal": 0.0,
+  "interest": 0.079
+ },
+ {
+  "instrument": "n31a",
+  "period": "2027",
+  "principal": 0.0,
+  "interest": 0.158
+ },
+ {
+  "instrument": "n31a",
+  "period": "2028",
+  "principal": 0.0,
+  "interest": 0.158
+ },
+ {
+  "instrument": "n31a",
+  "period": "2029",
+  "principal": 0.0,
+  "interest": 0.158
+ },
+ {
+  "instrument": "n31a",
+  "period": "2030",
+  "principal": 0.0,
+  "interest": 0.158
+ },
+ {
+  "instrument": "n31a",
+  "period": "2031",
+  "principal": 1.75,
+  "interest": 0.026
+ },
+ {
+  "instrument": "n31b",
+  "period": "2H26",
+  "principal": 0.0,
+  "interest": 0.134
+ },
+ {
+  "instrument": "n31b",
+  "period": "2027",
+  "principal": 0.0,
+  "interest": 0.268
+ },
+ {
+  "instrument": "n31b",
+  "period": "2028",
+  "principal": 0.0,
+  "interest": 0.268
+ },
+ {
+  "instrument": "n31b",
+  "period": "2029",
+  "principal": 0.0,
+  "interest": 0.268
+ },
+ {
+  "instrument": "n31b",
+  "period": "2030",
+  "principal": 0.0,
+  "interest": 0.268
+ },
+ {
+  "instrument": "n31b",
+  "period": "2031",
+  "principal": 2.75,
+  "interest": 0.223
+ },
+ {
+  "instrument": "n32",
+  "period": "2H26",
+  "principal": 0.0,
+  "interest": 0.06
+ },
+ {
+  "instrument": "n32",
+  "period": "2027",
+  "principal": 0.0,
+  "interest": 0.12
+ },
+ {
+  "instrument": "n32",
+  "period": "2028",
+  "principal": 0.0,
+  "interest": 0.12
+ },
+ {
+  "instrument": "n32",
+  "period": "2029",
+  "principal": 0.0,
+  "interest": 0.12
+ },
+ {
+  "instrument": "n32",
+  "period": "2030",
+  "principal": 0.0,
+  "interest": 0.12
+ },
+ {
+  "instrument": "n32",
+  "period": "2031",
+  "principal": 0.0,
+  "interest": 0.12
+ },
+ {
+  "instrument": "n32",
+  "period": "2032",
+  "principal": 1.25,
+  "interest": 0.07
+ },
+ {
+  "instrument": "n32e",
+  "period": "2H26",
+  "principal": 0.0,
+  "interest": 0.097
+ },
+ {
+  "instrument": "n32e",
+  "period": "2027",
+  "principal": 0.0,
+  "interest": 0.194
+ },
+ {
+  "instrument": "n32e",
+  "period": "2028",
+  "principal": 0.0,
+  "interest": 0.194
+ },
+ {
+  "instrument": "n32e",
+  "period": "2029",
+  "principal": 0.0,
+  "interest": 0.194
+ },
+ {
+  "instrument": "n32e",
+  "period": "2030",
+  "principal": 0.0,
+  "interest": 0.194
+ },
+ {
+  "instrument": "n32e",
+  "period": "2031",
+  "principal": 0.0,
+  "interest": 0.194
+ },
+ {
+  "instrument": "n32e",
+  "period": "2032",
+  "principal": 2.279,
+  "interest": 0.113
+ },
+ {
+  "instrument": "mag",
+  "period": "2H26",
+  "principal": 0.0,
+  "interest": 0.011
+ },
+ {
+  "instrument": "mag",
+  "period": "2027",
+  "principal": 0.0,
+  "interest": 0.023
+ },
+ {
+  "instrument": "mag",
+  "period": "2028",
+  "principal": 0.0,
+  "interest": 0.023
+ },
+ {
+  "instrument": "mag",
+  "period": "2029",
+  "principal": 0.189,
+  "interest": 0.002
+ },
+ {
+  "instrument": "cv31",
+  "period": "2H26",
+  "principal": 0.0,
+  "interest": 0.023
+ },
+ {
+  "instrument": "cv31",
+  "period": "2027",
+  "principal": 0.0,
+  "interest": 0.045
+ },
+ {
+  "instrument": "cv31",
+  "period": "2028",
+  "principal": 0.0,
+  "interest": 0.045
+ },
+ {
+  "instrument": "cv31",
+  "period": "2029",
+  "principal": 0.0,
+  "interest": 0.045
+ },
+ {
+  "instrument": "cv31",
+  "period": "2030",
+  "principal": 0.0,
+  "interest": 0.045
+ },
+ {
+  "instrument": "cv31",
+  "period": "2031",
+  "principal": 2.588,
+  "interest": 0.045
+ },
+ {
+  "instrument": "cv32",
+  "period": "2H26",
+  "principal": 0.0,
+  "interest": 0.035
+ },
+ {
+  "instrument": "cv32",
+  "period": "2027",
+  "principal": 0.0,
+  "interest": 0.07
+ },
+ {
+  "instrument": "cv32",
+  "period": "2028",
+  "principal": 0.0,
+  "interest": 0.07
+ },
+ {
+  "instrument": "cv32",
+  "period": "2029",
+  "principal": 0.0,
+  "interest": 0.07
+ },
+ {
+  "instrument": "cv32",
+  "period": "2030",
+  "principal": 0.0,
+  "interest": 0.07
+ },
+ {
+  "instrument": "cv32",
+  "period": "2031",
+  "principal": 0.0,
+  "interest": 0.07
+ },
+ {
+  "instrument": "cv32",
+  "period": "2032",
+  "principal": 4.0,
+  "interest": 0.058
+ },
+ {
+  "instrument": "cv33",
+  "period": "2H26",
+  "principal": 0.0,
+  "interest": 0.03
+ },
+ {
+  "instrument": "cv33",
+  "period": "2027",
+  "principal": 0.0,
+  "interest": 0.121
+ },
+ {
+  "instrument": "cv33",
+  "period": "2028",
+  "principal": 0.0,
+  "interest": 0.121
+ },
+ {
+  "instrument": "cv33",
+  "period": "2029",
+  "principal": 0.0,
+  "interest": 0.121
+ },
+ {
+  "instrument": "cv33",
+  "period": "2030",
+  "principal": 0.0,
+  "interest": 0.121
+ },
+ {
+  "instrument": "cv33",
+  "period": "2031",
+  "principal": 0.0,
+  "interest": 0.121
+ },
+ {
+  "instrument": "cv33",
+  "period": "2032",
+  "principal": 0.0,
+  "interest": 0.121
+ },
+ {
+  "instrument": "cv33",
+  "period": "2033",
+  "principal": 4.2,
+  "interest": 0.04
+ }
+]

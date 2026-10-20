@@ -1,0 +1,14 @@
+{
+  "description": "Every CoreWeave debt instrument, pro forma: Jun 30, 2026 10-Q balances plus the post-quarter DDTL 5.5 and revolver draws and the Sep 2026 2.875% converts. Ratings, coupons, maturities and 10-Q Note 10 effective rates (whole %, as in the user's chart); note and convert yields computed by Claude from mid-Oct 2026 prices; loan yields are all-in coupons at SOFR 3.87%; vendor-financing coupon rates are estimates.",
+  "fixed": true,
+  "source": {
+    "kind": "file",
+    "name": "crwv_instruments.json",
+    "url": "/_blob/ac092323c5c3aeb0ff4355375faabcbd"
+  },
+  "title": "CRWV debt instruments",
+  "updated": {
+    "at": "2026-10-20T14:39:42Z",
+    "by": "Claude"
+  }
+}
