@@ -14,8 +14,9 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     b = sub.add_parser("build", help="build the dashboard for a ticker")
     b.add_argument("ticker")
-    b.add_argument("--refresh", action="store_true", help="ignore cached SEC files and the cached LLM answer")
-    b.add_argument("--no-llm", action="store_true", help="skip the instrument extraction; SEC totals only")
+    b.add_argument("--refresh", action="store_true", help="ignore cached SEC files and cached LLM answers")
+    b.add_argument("--no-llm", action="store_true",
+                   help="no model calls: SEC totals only, no 6-K figures, no market read")
     s = sub.add_parser("serve", help="run the local web page")
     s.add_argument("--port", type=int, default=8765)
     sub.add_parser("list", help="list built dashboards")

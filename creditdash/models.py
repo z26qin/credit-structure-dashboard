@@ -344,6 +344,34 @@ class ModelOutput(BaseModel):
     headline: Headline | None = None
 
 
+Verdict = Literal["overreaction", "fair", "underpricing", "unclear"]
+
+
+class Implied(BaseModel):
+    """Default probability implied by a 5-year CDS or the worst bond's spread (creditrisk.py)."""
+    basis: str  # "5-year CDS" or "worst bond: <name>"
+    spread_bps: float
+    recovery: float
+    hazard: float
+    pd_1y: float
+    pd_5y: float
+
+
+class Assessment(BaseModel):
+    """The model's read of the market price against cash flow, every {key} placeholder filled in by code."""
+    verdict: Verdict
+    reasons: list[str]
+    watch: str = ""
+    cited: list[str]
+
+
+class RiskView(BaseModel):
+    implied: Implied | None
+    metrics: dict[str, float | None]
+    assessment: Assessment | None = None
+    note: str = ""
+
+
 class Dashboard(BaseModel):
     company: Company
     filing: Filing
@@ -356,5 +384,5 @@ class Dashboard(BaseModel):
     market: Market
     model: ModelOutput
     settings: dict
-    risk: dict | None = None  # creditrisk.RiskView as data
+    risk: RiskView | None = None
     basis: list[str] = []  # where each part of the figures comes from, when that needs saying (20-F filers)

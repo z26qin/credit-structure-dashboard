@@ -1,4 +1,7 @@
-"""ticker -> resolve -> fetch -> facts -> extract -> reconcile -> market -> model -> render -> index.html"""
+"""ticker -> resolve -> fetch -> facts -> extract -> reconcile -> market -> model -> render -> index.html
+
+The model stage also builds the top card: the coverage tests (headline.py) and the market read (creditrisk.py).
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -9,12 +12,11 @@ from typing import Callable
 
 import httpx
 
-from . import interim, llm
+from . import creditrisk, interim, llm
 from .config import ModelSettings, Settings, load_model_settings
 from .edgar import Edgar, archive_url, companyfacts_url, instance_doc
 from .errors import SecError, UnsupportedFiler
 from .extract import PROMPT_VERSION, extract
-from .creditrisk import risk_view
 from .facts import build_financials, fiscal_year_of
 from .interim import debt_filings, extract_interim, find_interim, verify
 from .market import fetch_market
@@ -89,15 +91,17 @@ def build(ticker: str, *, settings: Settings, refresh: bool = False, no_llm: boo
     model_settings = model_settings or load_model_settings()
     model = run_model(instruments, financials, market, model_settings, undrawn_revolver=reconciliation.undrawn_revolver)
     reconciliation.fit_error = model.fit_error
-    risk = risk_view(financials, model, market, model_settings.recovery_rate, use_llm=not no_llm, ask=ask,
-                     settings=settings, use_cache=not refresh)
+    risk = creditrisk.risk_view(financials, model, market, model_settings.recovery_rate, use_llm=not no_llm,
+                                ask=ask, settings=settings, use_cache=not refresh)
+    if not no_llm and risk.implied is not None:  # the model was asked for its read, with this prompt
+        inputs.settings["risk_prompt_version"] = creditrisk.PROMPT_VERSION
 
     progress("render")
     dashboard = Dashboard(
         company=company, filing=inputs.periodic, built_at=datetime.now().replace(microsecond=0),
         financials=financials, extraction=extraction, extraction_skipped=skipped, instruments=instruments,
         reconciliation=reconciliation, market=market, model=model, basis=inputs.basis,
-        risk=risk.model_dump(mode="json"),
+        risk=risk,
         settings=model_settings.model_dump() | {"llm_model": None if no_llm else settings.llm_model,
                                                 "prompt_version": None if no_llm else PROMPT_VERSION} | inputs.settings,
     )

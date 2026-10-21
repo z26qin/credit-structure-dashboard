@@ -272,6 +272,11 @@
         "refinancing_rate_pct), so its interest keeps running; it is shown separately wherever it appears. Funding for capex " +
         "is not added: it stays in 'cash to raise', because new debt for growth without the EBITDA it buys would understate coverage."));
     }
+    const risk = D.risk;
+    if (risk && risk.implied) ml.append(el("li", {}, "Market vs cash flow: default probability implied by the " +
+      risk.implied.basis + " at " + pct(risk.implied.recovery * 100, 0) + " recovery, with a flat hazard rate. " +
+      (risk.assessment ? "The read is by " + D.settings.llm_model + " (prompt " + D.settings.risk_prompt_version +
+        "); code fills in every number in it." : "No read: " + (risk.note || "skipped") + ".")));
     ml.append(el("li", {}, "Scenarios: consensus when given in overrides (current year less reported quarters); TTM held flat; run-rate = latest quarter × 4; stress = consensus or TTM less " +
       Math.round((D.settings.stress_haircut || 0) * 100) + "% from the fiscal year after the period end."));
     const undated = D.instruments.filter((i) => balance(i) > 0 && (i.source === "reconcile" || !i.maturity));

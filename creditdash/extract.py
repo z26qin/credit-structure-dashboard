@@ -1,4 +1,5 @@
-"""The one LLM step: the debt footnote (and debt 8-Ks) -> a typed instrument list.
+"""The debt-note LLM step: the debt footnote (and debt 8-Ks) -> a typed instrument list. The other two model
+reads are interim.py (6-K statements for 20-F filers) and creditrisk.py (the market read).
 
 Code finds the text; the model only reads it. Any failure returns a reason instead of an extraction, and
 the dashboard is then built from SEC totals alone.

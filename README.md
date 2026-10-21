@@ -17,7 +17,7 @@ cp .env.example .env   # then fill it in
 | Variable | What it is |
 |---|---|
 | `SEC_USER_AGENT` | Required by the SEC: `Your Name you@example.com` |
-| `LLM_API_KEY` | DeepSeek key, for the instrument extraction (without it you get the SEC-totals view) |
+| `LLM_API_KEY` | DeepSeek key, for the three model reads (see "Where the model is used"); without it you get SEC totals only, no 6-K figures and no market read |
 | `LLM_BASE_URL`, `LLM_MODEL` | Default `https://api.deepseek.com`, `deepseek-flash` |
 | `LLM_REASONING_EFFORT` | Default `low` (see "Cost and speed") |
 
@@ -25,14 +25,15 @@ cp .env.example .env   # then fill it in
 
 ```bash
 uv run creditdash build CRWV            # writes out/CRWV/<period end>/index.html
-uv run creditdash build CRWV --no-llm   # SEC totals only, no model call
-uv run creditdash build CRWV --refresh  # ignore cached SEC files and the cached model answer
+uv run creditdash build CRWV --no-llm   # no model calls: SEC totals only, no 6-K figures, no market read
+uv run creditdash build CRWV --refresh  # ignore cached SEC files and cached model answers
 uv run creditdash serve --port 8777     # local page with a ticker box (binds 127.0.0.1)
 uv run creditdash list
 ```
 
-Optional hand-written inputs (consensus, bond yields, ratings, share price) go in
-`overrides/<TICKER>.yaml`; see `overrides/README.md`.
+Optional hand-written inputs (consensus, bond yields, 5-year CDS, ratings, share price) go in
+`overrides/<TICKER>.yaml`; see `overrides/README.md`. Without a bond yield or CDS the top card shows the
+cash-flow side only.
 
 ## How it works
 
@@ -44,14 +45,36 @@ ticker → resolve → fetch → facts → extract → reconcile → market → 
   8-Ks (items 1.01 / 2.03) filed since the period end. Throttled to 5 requests/s, cached under `.creditdash/`.
 - **facts**: XBRL totals (debt, cash, leases, backlog), the maturity schedule (the 10-K's when the 10-Q has
   none), and eight quarters of revenue, EBITDA (operating income + D&A), interest, cash flow and capex.
-- **extract**: the only model call. Code finds the debt note (the 10-Q's and the 10-K's) and the 8-K items;
-  DeepSeek returns a typed instrument list with verbatim quotes. Prompt: `creditdash/prompts/extract_v5.md`.
+- **extract**: code finds the debt note (the 10-Q's and the 10-K's) and the 8-K items; DeepSeek returns a
+  typed instrument list with verbatim quotes.
 - **reconcile**: every quote must appear in the filing text sent; instruments must add up to the reported
   debt (≤1% pass, ≤5% warn, else fail). The gap is drawn as "Unallocated", never filled in.
 - **model**: monthly debt service per instrument, fitted to the reported maturity schedule; EBITDA
   scenarios (consensus if given, TTM, run-rate, stress −30%); coverage, cash to raise, capital stack with
-  attachment points, and the cash waterfall.
+  attachment points, and the cash waterfall. Maturities are assumed refinanced at today's average rate
+  (`refinancing_rate_pct` in `config/model.yaml` overrides it), so their interest keeps running; capex
+  funding stays in "cash to raise".
+- **top card** (`headline.py`, `creditrisk.py`, run in the model stage): four tests of the next 12 months'
+  interest (EBITDA, operating cash flow before interest, the same after capex, and liquidity, meaning cash
+  plus undrawn revolvers, against interest and principal), each covered (≥2.0x; liquidity ≥1.5x), thin
+  (≥1.0x) or not covered, and a bottom line written from those statuses. Beside them, the default
+  probability a 5-year CDS or the worst bond's yield over SOFR implies, and the model's read of price
+  against cash flow.
 - **render**: one template, data and d3 inlined. Every number names its source in "Sources and method".
+
+## Where the model is used
+
+Three steps ask DeepSeek, and code checks every answer before it reaches the page:
+
+| Step | Prompt | What code checks |
+|---|---|---|
+| Debt note → instrument list | `extract_v6.md` | each quote is in the filing text; instruments add up to the reported debt |
+| 6-K statements (20-F filers only) | `interim_v2.md` | each figure's row is in the 6-K text and shows the number |
+| Market vs cash flow read | `risk_v3.md` | it writes no numbers: figures are `{key}` placeholders that code fills in, and a draft with its own numbers or unknown keys is sent back once, then left out |
+
+Each `dashboard.json` records the prompts used (`prompt_version`, `interim_prompt_version`,
+`risk_prompt_version` in `settings`); the page's "Sources and method" names the debt-note and market-read
+prompts.
 
 ## 20-F filers (e.g. NBIS)
 
@@ -92,4 +115,5 @@ Q2 2026 filings and an accepted extraction, checked as a golden test.
   may be as of the 10-K date (the reconciliation badge shows the gap).
 - Debt with no maturity (category totals, the unallocated gap) follows whatever the reported schedule
   leaves after dated instruments; the method section says so.
-- The model's reading varies run to run; the cache keeps a filing's answer stable once accepted.
+- The model's reading varies run to run; the cache keeps a filing's answer stable once accepted. That
+  includes the market verdict: new figures or a new prompt can change it.

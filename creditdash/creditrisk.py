@@ -12,33 +12,23 @@ import json
 import math
 import re
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Callable
 
 from pydantic import BaseModel
 
 from . import llm
 from .config import Settings
 from .errors import LlmError
-from .model import money
-from .models import Financials, Market, ModelOutput
+from .headline import money
+from .models import Assessment, Financials, Implied, Market, ModelOutput, RiskView, Verdict
 
 PROMPT_VERSION = "risk_v3"
 PROMPT_FILE = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 
 
-class Implied(BaseModel):
-    basis: str  # "5-year CDS" or "worst bond: <name>"
-    spread_bps: float
-    recovery: float
-    hazard: float
-    pd_1y: float
-    pd_5y: float
-
-
 PLACEHOLDER = re.compile(r"\{([A-Za-z0-9_]+)\}")
 SPOKEN_PERIOD = re.compile(r"\b(?:1|5|12)[- ](?:year|month)s?\b")  # "next 12 months" is not a figure
 OWN_UNIT = re.compile(r"\{\w+_to_\w+\}\s*(?:times|x)\b|\b(?:negative|minus)\s+(?:of\s+)?\{", re.I)
-Verdict = Literal["overreaction", "fair", "underpricing", "unclear"]
 
 
 class Draft(BaseModel):
@@ -46,21 +36,6 @@ class Draft(BaseModel):
     verdict: Verdict
     reasons: list[str]
     watch: str = ""
-
-
-class Assessment(BaseModel):
-    """The draft with every placeholder filled in by code."""
-    verdict: Verdict
-    reasons: list[str]
-    watch: str = ""
-    cited: list[str]
-
-
-class RiskView(BaseModel):
-    implied: Implied | None
-    metrics: dict[str, float | None]
-    assessment: Assessment | None = None
-    note: str = ""
 
 
 def implied(market: Market, recovery: float) -> Implied | None:

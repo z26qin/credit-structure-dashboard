@@ -213,27 +213,6 @@ def test_headline_tests_and_statuses(out):
                                         "liquidity falls short of next year's interest and principal.")
 
 
-def test_bottom_line_is_written_from_the_statuses_alone():
-    from creditdash.model import bottom_line
-    keys = ("ebitda_to_next12m_interest", "cfo_plus_interest_to_interest", "fcf_plus_interest_to_interest",
-            "liquidity_to_next12m_debt_service")
-    s = lambda *v: dict(zip(keys, v))
-    assert bottom_line(s("not_covered", "covered", "not_covered", "covered")) == (
-        "Burns cash on capex", "Earnings don't cover interest; operating cash flow does. "
-        "Cash flow doesn't cover capex and interest; liquidity covers next year's interest and principal.")
-    assert bottom_line(s("covered", "covered", "thin", "not_covered")) == (
-        "Pays its way, but must refinance", "Cash flow only just covers capex and interest; "
-        "liquidity falls short of next year's interest and principal.")
-    assert bottom_line(s("covered", "covered", "covered", "thin"))[0] == "Self-funding"
-    assert bottom_line(s("n/a", "n/a", "n/a", "n/a")) == (None, "")
-
-
-def test_thin_status_between_one_and_two():
-    from creditdash.model import status_for
-    assert (status_for(2.0), status_for(1.5), status_for(0.99), status_for(None)) == \
-        ("covered", "thin", "not_covered", "n/a")
-
-
 def test_undrawn_commitments_count_as_liquidity():
     revolver = inst("Revolver", 20, maturity="2029-11", seniority="parent_secured", amortization="bullet", fixed=7.0)
     revolver = revolver.model_copy(update={"kind": "revolver", "commitment": 100.0})

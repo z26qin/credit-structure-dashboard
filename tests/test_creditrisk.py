@@ -2,7 +2,7 @@ from pytest import approx
 
 from creditdash.creditrisk import Draft, assess, implied, metrics, risk_view
 from creditdash.errors import LlmError
-from creditdash.models import Fact
+from creditdash.models import Fact, RiskView
 from creditdash.model import run_model
 from creditdash.render import render
 from tests.sample import sample_dashboard
@@ -93,9 +93,10 @@ def test_model_sees_each_figure_as_the_page_shows_it():
 
 def test_risk_card_is_first_and_highlighted():
     imp = implied(MKT.model_copy(update={"cds_bps": Fact(value=600)}), 0.4)
-    view = {"implied": imp.model_dump(), "metrics": {"ebitda_to_next12m_interest": 2.5, "cfo_plus_interest_to_interest": 4.0},
-            "assessment": {"verdict": "overreaction", "reasons": ["Coverage <b>holds</b>.", "Liquidity is ample."],
-                           "watch": "The next refinancing.", "cited": ["pd_5y"]}, "note": ""}
+    view = RiskView.model_validate({
+        "implied": imp.model_dump(), "metrics": {"ebitda_to_next12m_interest": 2.5, "cfo_plus_interest_to_interest": 4.0},
+        "assessment": {"verdict": "overreaction", "reasons": ["Coverage <b>holds</b>.", "Liquidity is ample."],
+                       "watch": "The next refinancing.", "cited": ["pd_5y"]}, "note": ""})
     html = render(sample_dashboard().model_copy(update={"risk": view}))
     assert html.index('id="risk"') < html.index('id="kpis"') and 'cw-risk is-overreaction' in html
     assert "39.3%" in html and "Looks like an overreaction" in html and "&lt;b&gt;holds" in html

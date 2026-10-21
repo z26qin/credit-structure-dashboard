@@ -1,9 +1,11 @@
+import json
 from datetime import date
 
 import httpx
 import pytest
 
 from creditdash import cli, pipeline
+from creditdash.creditrisk import Draft
 from creditdash.errors import UnknownTicker
 from creditdash.models import Dashboard, Extraction, Instrument, ReconStatus
 from tests.test_market import Market
@@ -20,13 +22,16 @@ EXTRACTION = Extraction(period_end=date(2026, 6, 30), unit_note="$ millions", in
 
 
 class Llm(httpx.MockTransport):
-    def __init__(self):
+    """Answers the debt-note request with EXTRACTION and the market read (schema "Draft") with `read`."""
+    def __init__(self, read: Draft | None = None):
         self.calls = 0
 
         def handle(r):
             self.calls += 1
+            is_read = '"title": "Draft"' in json.loads(r.content)["messages"][0]["content"]
+            reply = read if is_read and read is not None else EXTRACTION
             return httpx.Response(200, json={
-                "choices": [{"message": {"content": EXTRACTION.model_dump_json()}, "finish_reason": "stop"}],
+                "choices": [{"message": {"content": reply.model_dump_json()}, "finish_reason": "stop"}],
                 "usage": {"prompt_tokens": 9000, "completion_tokens": 900}})
         super().__init__(handle)
 
@@ -54,6 +59,20 @@ def test_build_writes_outputs(settings, transports, tmp_path):
     assert d.instruments[-1].name == "Unallocated"
     assert d.settings["llm_model"] == "deepseek-flash" and d.settings["prompt_version"] == "extract_v6"
     assert transports["llm_transport"].calls == 1
+    assert d.risk.implied is None and "risk_prompt_version" not in d.settings  # no CDS or bond yield: no read
+
+
+def test_market_read_is_typed_and_its_prompt_recorded(settings, sec_transport, tmp_path):
+    (tmp_path / "overrides").mkdir()
+    (tmp_path / "overrides" / "CRWV.yaml").write_text("cds_5y_bps: 600\n")
+    read = Draft(verdict="fair", reasons=["The price fits free cash flow of {ttm_fcf}."])
+    transports = {"sec_transport": sec_transport, "llm_transport": Llm(read), "market_transport": Market()}
+    path, _ = build(settings, transports, tmp_path)
+    d = Dashboard.model_validate_json((path.parent / "dashboard.json").read_text())
+    assert d.settings["risk_prompt_version"] == "risk_v3"
+    assert d.risk.implied.basis == "5-year CDS" and d.risk.assessment.verdict == "fair"
+    assert d.risk.assessment.reasons[0].startswith("The price fits free cash flow of ")
+    assert "{ttm_fcf}" not in d.risk.assessment.reasons[0]
 
 
 def test_latest_10k_read_for_detail(settings, transports, tmp_path):
