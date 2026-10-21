@@ -1,5 +1,7 @@
 # creditdash
 
+> [Read this README on the styled page](https://z26qin.github.io/credit-structure-dashboard/)
+
 Ticker in, credit-structure dashboard out. For a company that files 10-Ks and 10-Qs (or a 20-F in US GAAP) with the SEC,
 `creditdash` reads its latest filings and builds one offline HTML page for a credit investor: who the
 company owes, in what order, when it comes due, and whether cash flow covers it. The layout follows the
