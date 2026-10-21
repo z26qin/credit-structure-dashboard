@@ -102,6 +102,9 @@ A new filing takes about 30–80 s and $0.01–0.03; rebuilds of the same filing
 uv run pytest -q
 ```
 
+`uv run python scripts/build_pages.py` rebuilds `docs/index.html`, the GitHub Pages copy of this README
+(styled by `docs/page.html`); run it after editing the README.
+
 Offline: SEC, NY Fed, Yahoo and DeepSeek are mocked. `tests/fixtures/crwv-2026q2/` holds CoreWeave's
 Q2 2026 filings and an accepted extraction, checked as a golden test.
 

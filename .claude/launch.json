@@ -8,6 +8,12 @@
       "port": 8799
     },
     {
+      "name": "docs-static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8798", "--bind", "127.0.0.1", "--directory", "docs"],
+      "port": 8798
+    },
+    {
       "name": "creditdash-web",
       "runtimeExecutable": "uv",
       "runtimeArgs": ["run", "creditdash", "serve", "--port", "8765"],

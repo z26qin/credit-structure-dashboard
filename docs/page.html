@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>creditdash</title>
+<meta name="description" content="Ticker in, credit-structure dashboard out.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #ece7df; --paper: #f8f4ee; --ink: #22201c; --ink-2: #5f5b53; --ink-3: #8b867c;
+    --line: #e2ddd4; --chip: #efeae2; --chip-line: #e1dbd1; --head: #f1ede6; --accent: #2f5fa7; --code: #c4683f;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--page); color: var(--ink); }
+  body { font: 400 19px/1.6 var(--serif); padding: 24px 16px; -webkit-font-smoothing: antialiased; }
+  .sheet { max-width: 1040px; margin: 0 auto; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid var(--line); font: 400 15px/1 var(--mono); color: var(--ink-2); }
+  .bar a { color: var(--ink-2); text-decoration: none; font-family: var(--mono); }
+  .bar a:hover { color: var(--ink); }
+  .body { display: grid; grid-template-columns: 72px minmax(0, 1fr); padding: 40px 48px 64px 8px; }
+  .outline { position: sticky; top: 40px; align-self: start; display: flex; flex-direction: column; gap: 9px; padding: 14px 0 0 28px; }
+  .outline a { display: block; width: 20px; height: 2px; background: #c9c3b8; border-radius: 1px; }
+  .outline a.is-active { width: 26px; height: 3px; background: var(--accent); }
+  .outline a:hover { background: var(--ink-2); }
+  main { max-width: 860px; min-width: 0; }
+  h1 { font: 600 40px/1.15 var(--serif); margin: 0 0 14px; letter-spacing: -.01em; }
+  h2 { font: 600 28px/1.25 var(--serif); margin: 48px 0 14px; scroll-margin-top: 24px; }
+  h3 { font: 600 22px/1.3 var(--serif); margin: 32px 0 10px; }
+  p, li { margin: 0 0 14px; }
+  ul, ol { padding-left: 1.3em; margin: 0 0 16px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--accent); }
+  strong { font-weight: 600; }
+  code { font: 400 .84em/1.4 var(--mono); background: var(--chip); border: 1px solid var(--chip-line); border-radius: 5px; padding: .08em .38em; white-space: break-spaces; }
+  .code { position: relative; margin: 6px 0 22px; padding: 18px 22px; border-radius: 10px; background: transparent; }
+  .code pre { margin: 0; padding-right: 96px; overflow-x: auto; font: 400 16px/1.75 var(--mono); color: var(--code); }
+  .code pre code { background: none; border: 0; padding: 0; font: inherit; color: inherit; white-space: pre; }
+  .code .c { color: var(--ink-3); }
+  .code .tools { position: absolute; top: 16px; right: 14px; display: flex; align-items: center; gap: 10px; font: 400 14px/1 var(--mono); color: var(--ink-3); }
+  .code button { border: 0; background: none; padding: 2px; cursor: pointer; color: var(--ink-2); font: inherit; }
+  .code button:hover { color: var(--ink); }
+  .code.plain pre { color: var(--ink); }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 8px 0 26px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font-size: 17px; }
+  th, td { text-align: left; vertical-align: top; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+  th { background: var(--head); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td code { font-size: .86em; }
+  .table-wrap { overflow-x: auto; }
+  blockquote { margin: 0 0 16px; padding: 2px 0 2px 16px; border-left: 3px solid var(--line); color: var(--ink-2); }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+  @media (max-width: 760px) {
+    body { font-size: 17px; padding: 0; }
+    .sheet { border-radius: 0; border-left: 0; border-right: 0; }
+    .body { grid-template-columns: 1fr; padding: 28px 16px 48px; }
+    .outline { display: none; }
+    h1 { font-size: 32px; } h2 { font-size: 24px; }
+    .code { padding: 14px 4px; }
+    .code pre { padding-right: 0; padding-top: 22px; }
+    table { min-width: 560px; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="bar"><span>README.md</span><a href="https://github.com/z26qin/credit-structure-dashboard" title="Source on GitHub">&lt;/&gt;</a></div>
+  <div class="body">
+    <nav class="outline" id="outline" aria-label="Sections"></nav>
+    <main id="content"><noscript>This page needs JavaScript to render the README.</noscript></main>
+  </div>
+</div>
+<script type="text/markdown" id="readme">{{README}}</script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  const main = document.getElementById("content");
+  main.innerHTML = marked.parse(document.getElementById("readme").textContent);
+
+  // Code blocks: a language label and a copy button; shell comments in gray.
+  main.querySelectorAll("pre > code").forEach((code) => {
+    const pre = code.parentElement, lang = (code.className.match(/language-(\w+)/) || [])[1] || "";
+    const box = document.createElement("div");
+    box.className = "code" + (lang === "bash" || lang === "sh" ? "" : " plain");
+    pre.replaceWith(box);
+    box.append(pre);
+    if (lang === "bash" || lang === "sh") {
+      const lines = code.textContent.split("\n");
+      code.replaceChildren(...lines.flatMap((line, k) => {
+        const i = line.indexOf("#"), out = [];
+        if (i < 0) out.push(document.createTextNode(line));
+        else {
+          out.push(document.createTextNode(line.slice(0, i)));
+          const c = document.createElement("span"); c.className = "c"; c.textContent = line.slice(i); out.push(c);
+        }
+        if (k < lines.length - 1) out.push(document.createTextNode("\n"));
+        return out;
+      }));
+    }
+    const tools = document.createElement("div");
+    tools.className = "tools";
+    if (lang) tools.append(lang);
+    const copy = document.createElement("button");
+    copy.type = "button"; copy.textContent = "copy"; copy.setAttribute("aria-label", "Copy code");
+    copy.addEventListener("click", () => {
+      navigator.clipboard.writeText(code.textContent).then(() => {
+        copy.textContent = "copied"; setTimeout(() => { copy.textContent = "copy"; }, 1200);
+      }).catch(() => {});
+    });
+    tools.append(copy);
+    box.append(tools);
+  });
+  main.querySelectorAll("table").forEach((t) => {
+    const w = document.createElement("div"); w.className = "table-wrap"; t.replaceWith(w); w.append(t);
+  });
+
+  // Outline: one mark per section, the one in view highlighted.
+  const nav = document.getElementById("outline");
+  const heads = [...main.querySelectorAll("h1, h2")];
+  heads.forEach((h, k) => {
+    h.id = h.id || h.textContent.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "s" + k;
+    const a = document.createElement("a");
+    a.href = "#" + h.id; a.title = h.textContent; a.setAttribute("aria-label", h.textContent);
+    nav.append(a);
+  });
+  const marks = [...nav.children];
+  const update = () => {
+    let k = 0;
+    heads.forEach((h, i) => { if (h.getBoundingClientRect().top < 120) k = i; });
+    marks.forEach((m, i) => m.classList.toggle("is-active", i === k));
+  };
+  addEventListener("scroll", update, { passive: true });
+  update();
+})();
+</script>
+</body>
+</html>
