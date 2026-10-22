@@ -320,7 +320,7 @@ def main() -> None:
         if value.startswith("${user_config."):
             del os.environ[key]
     if root := os.environ.get("CREDITDASH_ROOT"):
-        root_path = Path(root).expanduser()
+        root_path = Path(os.path.expandvars(root)).expanduser()  # a setting may arrive as "${HOME}/creditdash"
         root_path.mkdir(parents=True, exist_ok=True)
         os.chdir(root_path)
     create_server().run("stdio")

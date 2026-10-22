@@ -1,6 +1,8 @@
 import asyncio
+import os
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 from mcp import Client
@@ -168,3 +170,19 @@ def test_list_dashboards(settings, build, opened):
     rows = r.structured_content["result"]
     assert [(x["ticker"], x["period"], x["company"]) for x in rows] == [
         ("CRWV", "2026-06-30", "Toy Compute, Inc."), ("NBIS", "2026-06-30", "Toy Compute, Inc.")]
+
+
+def test_main_expands_the_data_folder(tmp_path, monkeypatch):
+    from creditdash import mcp_server
+
+    class Stub:
+        def run(self, transport):
+            self.cwd = Path.cwd()
+
+    stub = Stub()
+    monkeypatch.setattr(mcp_server, "create_server", lambda: stub)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("CREDITDASH_ROOT", "${HOME}/creditdash")
+    monkeypatch.setenv("LLM_API_KEY", "${user_config.llm_api_key}")
+    mcp_server.main()
+    assert stub.cwd == (tmp_path / "creditdash").resolve() and "LLM_API_KEY" not in os.environ
