@@ -1,4 +1,4 @@
-"""creditdash build <TICKER> [--refresh] [--no-llm] | serve [--port 8765] | list"""
+"""creditdash build <TICKER> [--refresh] [--no-llm] | serve [--port 8765] | mcp | list"""
 from __future__ import annotations
 
 import argparse
@@ -19,8 +19,13 @@ def main(argv: list[str] | None = None) -> int:
                    help="no model calls: SEC totals only, no 6-K figures, no market read")
     s = sub.add_parser("serve", help="run the local web page")
     s.add_argument("--port", type=int, default=8765)
+    sub.add_parser("mcp", help="run as an MCP server over stdio (Claude Desktop, Claude Code)")
     sub.add_parser("list", help="list built dashboards")
     args = parser.parse_args(argv)
+    if args.command == "mcp":  # before Settings: CREDITDASH_ROOT decides which .env is read
+        from .mcp_server import main as mcp_main
+        mcp_main()
+        return 0
 
     settings = Settings.from_env()
     try:

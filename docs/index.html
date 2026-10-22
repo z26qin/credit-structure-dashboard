@@ -111,6 +111,39 @@ Optional hand-written inputs (consensus, bond yields, 5-year CDS, ratings, share
 `overrides/<TICKER>.yaml`; see `overrides/README.md`. Without a bond yield or CDS the top card shows the
 cash-flow side only.
 
+## Use from Claude (MCP)
+
+`creditdash mcp` runs the same pipeline as an MCP server over stdio.
+
+| Tool | What it does |
+|---|---|
+| `credit_snapshot(ticker)` | Builds the dashboard (from cache when it can) and returns a compact JSON summary for Claude to answer from: the four coverage tests and bottom line, balance sheet, TTM, every instrument, maturities, capital stack, market read |
+| `show_dashboard(ticker, period?)` | Shows the full page in the chat where the client renders MCP Apps; otherwise opens it in the browser |
+| `set_market_inputs(ticker, ...)` | Writes bond yields, 5-year CDS, ratings, consensus or price to `overrides/<TICKER>.yaml`, merging with what is there (YAML comments are not kept) |
+| `list_dashboards()` | The dashboards built so far |
+
+Builds report each stage as MCP progress. A missing ticker, an unsupported filer or a missing
+`SEC_USER_AGENT` comes back as a tool error Claude can read. With no `LLM_API_KEY` the server builds
+SEC totals only and says so in `notes`.
+
+**Claude Desktop.** Build the extension and double-click it:
+
+```bash
+uv run python scripts/build_mcpb.py   # dist/creditdash-<version>.mcpb; needs Node for npx
+```
+
+The install screen asks for your name and email (the SEC's User-Agent), an optional DeepSeek key (kept in
+the system keychain), and a data folder (default `~/creditdash`), which holds `out/`, `overrides/` and the
+cache. Claude Desktop installs Python and the dependencies with uv the first time it starts.
+
+**Claude Code**, from this checkout (it reads `.env` and writes `out/` here):
+
+```bash
+claude mcp add creditdash -- uv run --directory "$PWD" creditdash mcp
+```
+
+Set `CREDITDASH_ROOT` to keep the data elsewhere; the server changes to that folder at start.
+
 ## How it works
 
 ```

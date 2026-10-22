@@ -1,0 +1,64 @@
+{
+  "manifest_version": "0.4",
+  "name": "creditdash",
+  "display_name": "creditdash: credit-structure dashboard",
+  "version": "0.1.0",
+  "description": "Ticker in, credit-structure dashboard out: who a company owes, in what order, when it comes due, and whether cash flow covers it, from its SEC filings.",
+  "long_description": "Reads a company's latest 10-K/10-Q (or a US GAAP 20-F and its 6-Ks) from SEC EDGAR, extracts the debt note into a checked instrument list, and models debt service, coverage, the capital stack and the cash waterfall. Ask Claude about a ticker and it answers from a compact snapshot; ask to see it and the full dashboard opens in the chat or your browser. Needs your name and email for the SEC's User-Agent rule; a DeepSeek API key adds the instrument list and the market read (without one you get SEC totals only). Money is in $ millions.",
+  "author": {
+    "name": "z26qin",
+    "url": "https://github.com/z26qin"
+  },
+  "homepage": "https://z26qin.github.io/credit-structure-dashboard/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/z26qin/credit-structure-dashboard"
+  },
+  "icon": "icon.png",
+  "server": {
+    "type": "uv",
+    "entry_point": "creditdash/mcp_server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "--frozen", "--no-dev", "creditdash", "mcp"],
+      "env": {
+        "CREDITDASH_ROOT": "${user_config.data_dir}",
+        "SEC_USER_AGENT": "${user_config.sec_user_agent}",
+        "LLM_API_KEY": "${user_config.llm_api_key}"
+      }
+    }
+  },
+  "tools": [
+    {"name": "credit_snapshot", "description": "Build a company's dashboard from its latest SEC filings and return a compact summary: interest coverage, debt instruments, maturities, capital stack, market read."},
+    {"name": "show_dashboard", "description": "Show the full interactive dashboard in the chat, or open it in the browser."},
+    {"name": "set_market_inputs", "description": "Save bond yields, 5-year CDS, ratings, consensus or price that the filings don't have."},
+    {"name": "list_dashboards", "description": "List the dashboards built so far."}
+  ],
+  "user_config": {
+    "sec_user_agent": {
+      "type": "string",
+      "title": "Your name and email (for the SEC)",
+      "description": "The SEC requires every request to name a contact, e.g. \"Jane Doe jane@example.com\". It is sent only to sec.gov.",
+      "required": true
+    },
+    "llm_api_key": {
+      "type": "string",
+      "title": "DeepSeek API key (optional)",
+      "description": "Reads the debt note into an instrument list and writes the market read. Without it you get SEC totals only. About $0.01-0.03 per new filing.",
+      "sensitive": true,
+      "required": false
+    },
+    "data_dir": {
+      "type": "directory",
+      "title": "Data folder",
+      "description": "Where dashboards (out/), market inputs (overrides/) and the SEC cache are kept.",
+      "default": "${HOME}/creditdash",
+      "required": false
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {"python": ">=3.12"}
+  },
+  "keywords": ["credit", "debt", "SEC", "EDGAR", "10-K", "finance"]
+}
