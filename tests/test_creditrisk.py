@@ -30,7 +30,7 @@ def test_metrics_come_from_the_model_headline():
     out = run_model(TOY, FIN, MKT, SETTINGS)
     m = metrics(FIN, out)
     assert m["next12m_interest"] == approx(out.headline.next12m_interest)
-    assert m["ebitda_to_next12m_interest"] == approx(500 / out.headline.next12m_interest)
+    assert m["ebitda_to_next12m_interest"] == approx(600 / out.headline.next12m_interest)  # run-rate
     assert m["liquidity_to_next12m_debt_service"] == approx(
         next(t.value for t in out.headline.tests if t.key == "liquidity_to_next12m_debt_service"))
 

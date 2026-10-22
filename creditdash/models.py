@@ -85,6 +85,7 @@ class Quarter(BaseModel):
     cfo: float | None
     capex: float | None
     interest_capitalized: float | None = None  # interest added to assets under construction
+    sbc: float | None = None  # share-based compensation expense
 
     @computed_field
     @property
@@ -92,6 +93,14 @@ class Quarter(BaseModel):
         if self.operating_income is None or self.da is None:
             return None
         return self.operating_income + self.da
+
+    @computed_field
+    @property
+    def adj_ebitda(self) -> float | None:
+        """EBITDA with share-based compensation added back, the usual adjustment."""
+        if self.ebitda is None or self.sbc is None:
+            return None
+        return self.ebitda + self.sbc
 
 
 class Financials(BaseModel):
@@ -325,6 +334,8 @@ class Headline(BaseModel):
     ttm_interest_paid: float | None
     undrawn: float  # committed, undrawn revolvers
     liquidity: float | None  # cash + undrawn
+    earnings: float | None = None  # the EBITDA the earnings test divides: run-rate adj. EBITDA when it can
+    earnings_basis: str = ""  # e.g. "run-rate adj. EBITDA (Q2 26 × 4)"
     tests: list[CoverageTest]
     funding: str | None  # e.g. "Needs new capital": from the after-capex and liquidity statuses
     bottom_line: str  # the statuses in plain words, without numbers

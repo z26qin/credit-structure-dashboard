@@ -67,7 +67,7 @@ def test_20f_with_interim_6k(settings, tmp_path, interim_json):
     assert f"## Periodic filing 6-K {INTERIM}, period end 2026-06-30" in instruments_prompt
     assert f"## Annual filing 20-F {ANNUAL}, period end 2025-12-31" in instruments_prompt
     assert any("20-F" in b for b in d.basis) and any(INTERIM in b for b in d.basis)
-    assert d.settings["interim_prompt_version"] == "interim_v2"
+    assert d.settings["interim_prompt_version"] == "interim_v3"
     assert path.parent.name == "2026-06-30"
 
 

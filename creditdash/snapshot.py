@@ -40,6 +40,8 @@ def snapshot(d: Dashboard) -> dict:
         out["can_it_pay_interest"] = {
             "bottom_line": h.bottom_line,
             "funding": h.funding,
+            "earnings": _m(h.earnings),
+            "earnings_basis": h.earnings_basis,
             "tests": [{"label": t.label, "value": _x(t.value), "status": t.status, "detail": t.detail}
                       for t in h.tests],
             "next12m_interest": _m(h.next12m_interest),
@@ -55,7 +57,7 @@ def snapshot(d: Dashboard) -> dict:
         "backlog_rpo": _m(fin.rpo.value),
     }
     t = fin.ttm
-    out["ttm"] = {"period": t.label, "revenue": _m(t.revenue), "ebitda": _m(t.ebitda),
+    out["ttm"] = {"period": t.label, "revenue": _m(t.revenue), "ebitda": _m(t.ebitda), "stock_comp": _m(t.sbc),
                   "interest_expense": _m(t.interest_expense), "interest_paid": _m(t.interest_paid),
                   "operating_cash_flow": _m(t.cfo), "capex": _m(t.capex)}
     out["reconciliation"] = {

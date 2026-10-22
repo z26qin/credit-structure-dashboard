@@ -29,6 +29,22 @@ def _first_months(values: list[float], n: int = 12) -> float | None:
     return sum(values[:n]) if values else None
 
 
+def earnings(financials: Financials) -> tuple[float | None, str, str]:
+    """The EBITDA the earnings test uses, its name and where it comes from: the latest quarter's adj. EBITDA
+    (EBITDA + share-based compensation) × 4, so a fast grower is judged on what it earns now. Without stock
+    comp, or without a quarter, it falls back to run-rate EBITDA, then TTM adj. EBITDA, then TTM EBITDA."""
+    q, t = (financials.quarters[-1] if financials.quarters else None), financials.ttm
+    candidates = []
+    if q is not None:
+        candidates += [(q.adj_ebitda, 4, "run-rate adj. EBITDA", f"{q.label} × 4"),
+                       (q.ebitda, 4, "run-rate EBITDA", f"{q.label} × 4; no stock comp reported")]
+    candidates += [(t.adj_ebitda, 1, "adj. EBITDA", t.label), (t.ebitda, 1, "EBITDA", t.label)]
+    for value, times, name, source in candidates:
+        if value is not None:
+            return value * times, name, source
+    return None, "EBITDA", "not reported"
+
+
 def build_headline(financials: Financials, periods: list[Period], month_interest: list[float],
               month_principal: list[float], refinancing: list[RefinancingRow], refi_rate: float | None,
               outstanding: list[Instrument], undrawn_revolver: float | None) -> Headline:
@@ -54,12 +70,13 @@ def build_headline(financials: Financials, periods: list[Period], month_interest
     ratio = lambda a, b: None if a is None or not b else a / b
     cfo_pre = None if t.cfo is None or paid is None else t.cfo + paid
     fcf_pre = None if cfo_pre is None or t.capex is None else cfo_pre - t.capex
-    e, c, f = ratio(t.ebitda, i12), ratio(cfo_pre, i12), ratio(fcf_pre, i12)
+    earn, earn_name, earn_source = earnings(financials)
+    e, c, f = ratio(earn, i12), ratio(cfo_pre, i12), ratio(fcf_pre, i12)
     liq = ratio(liquidity, (i12 or 0) + (p12 or 0))
     paid_note = "" if t.interest_paid is not None else " (interest expense used for interest paid)"
     tests = [
         CoverageTest(key="ebitda_to_next12m_interest", label="Earnings", value=e, status=status_for(e),
-                     detail=f"EBITDA {money(t.ebitda)} (TTM) ÷ next-12-month interest {money(i12)}"),
+                     detail=f"{earn_name} {money(earn)} ({earn_source}) ÷ next-12-month interest {money(i12)}"),
         CoverageTest(key="cfo_plus_interest_to_interest", label="Operating cash flow", value=c, status=status_for(c),
                      detail=f"operating cash flow before interest {money(cfo_pre)} (TTM){paid_note}"),
         CoverageTest(key="fcf_plus_interest_to_interest", label="After capex", value=f, status=status_for(f),
@@ -72,7 +89,9 @@ def build_headline(financials: Financials, periods: list[Period], month_interest
     funding, line = bottom_line({x.key: x.status for x in tests})
     return Headline(next12m_interest=i12, next12m_principal=p12, next12m_refinancing_interest=refi12,
                     refinancing_rate_pct=refi_rate, ttm_interest_incurred=incurred, ttm_interest_paid=t.interest_paid,
-                    undrawn=undrawn, liquidity=liquidity, tests=tests, funding=funding, bottom_line=line)
+                    undrawn=undrawn, liquidity=liquidity, earnings=earn,
+                    earnings_basis=f"{earn_name} ({earn_source})", tests=tests,
+                    funding=funding, bottom_line=line)
 
 
 def bottom_line(status: dict[str, str]) -> tuple[str | None, str]:

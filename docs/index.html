@@ -154,7 +154,8 @@ ticker → resolve → fetch → facts → extract → reconcile → market → 
 - **resolve / fetch**: SEC EDGAR — the latest 10-Q or 10-K, the latest 10-K alongside a 10-Q, and debt
   8-Ks (items 1.01 / 2.03) filed since the period end. Throttled to 5 requests/s, cached under `.creditdash/`.
 - **facts**: XBRL totals (debt, cash, leases, backlog), the maturity schedule (the 10-K's when the 10-Q has
-  none), and eight quarters of revenue, EBITDA (operating income + D&A), interest, cash flow and capex.
+  none), and eight quarters of revenue, EBITDA (operating income + D&A), share-based compensation, interest,
+  cash flow and capex.
 - **extract**: code finds the debt note (the 10-Q's and the 10-K's) and the 8-K items; DeepSeek returns a
   typed instrument list with verbatim quotes.
 - **reconcile**: every quote must appear in the filing text sent; instruments must add up to the reported
@@ -167,9 +168,11 @@ ticker → resolve → fetch → facts → extract → reconcile → market → 
   (`refinancing_rate_pct` in `config/model.yaml` overrides it), so their interest keeps running; capex
   funding stays in "cash to raise".
 - **top card** (`headline.py`, `creditrisk.py`, run in the model stage): four tests of the next 12 months'
-  interest (EBITDA, operating cash flow before interest, the same after capex, and liquidity, meaning cash
-  plus undrawn revolvers, against interest and principal), each covered (≥2.0x; liquidity ≥1.5x), thin
-  (≥1.0x) or not covered, and a bottom line written from those statuses. Beside them, the default
+  interest (earnings, operating cash flow before interest, the same after capex, and liquidity, meaning cash
+  plus undrawn revolvers, against interest and principal). Earnings are run-rate adj. EBITDA: the latest
+  quarter's EBITDA plus share-based compensation, × 4, so a fast grower is judged on what it earns now; without
+  stock comp it is run-rate EBITDA, and without a quarter the trailing twelve months. Each test is covered
+  (≥2.0x; liquidity ≥1.5x), thin (≥1.0x) or not covered, and a bottom line written from those statuses. Beside them, the default
   probability a 5-year CDS or the worst bond's yield over SOFR implies, and the model's read of price
   against cash flow.
 - **render**: one template, data and d3 inlined. Every number names its source in "Sources and method".
@@ -181,7 +184,7 @@ Three steps ask DeepSeek, and code checks every answer before it reaches the pag
 | Step | Prompt | What code checks |
 |---|---|---|
 | Debt note → instrument list | `extract_v6.md` | each quote is in the filing text; instruments add up to the reported debt |
-| 6-K statements (20-F filers only) | `interim_v2.md` | each figure's row is in the 6-K text and shows the number |
+| 6-K statements (20-F filers only) | `interim_v3.md` | each figure's row is in the 6-K text and shows the number |
 | Market vs cash flow read | `risk_v3.md` | it writes no numbers: figures are `{key}` placeholders that code fills in, and a draft with its own numbers or unknown keys is sent back once, then left out |
 
 Each `dashboard.json` records the prompts used (`prompt_version`, `interim_prompt_version`,
@@ -193,7 +196,7 @@ prompts.
 A foreign private issuer files a 20-F once a year and furnishes quarterly results on 6-K, without XBRL.
 creditdash takes the 20-F's full year from XBRL, then looks through the 6-Ks filed after it for an exhibit
 with interim financial statements. If it finds one, the model reads the three statements and the debt note
-(prompt `creditdash/prompts/interim_v2.md`); every figure must sit in a row of the 6-K text that shows the
+(prompt `creditdash/prompts/interim_v3.md`); every figure must sit in a row of the 6-K text that shows the
 number, or it is dropped. The dashboard is then dated at the interim period end: balances and total debt
 (principal per the debt note) from the 6-K, last-twelve-month figures as full year + year to date − the
 prior year to date, and the debt list read from the 6-K's debt note with the 20-F for detail. 6-Ks filed

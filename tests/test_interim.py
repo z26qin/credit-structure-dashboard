@@ -59,6 +59,12 @@ def statements(text, **overrides) -> InterimStatements:
         "cfo_prior_ytd": Figure(value=-369.1, row=row(text, "Net cash provided by / (used in) operating activities |")),
         "capex_ytd": Figure(value=8130.3, row=row(text, "Purchases of property and equipment")),
         "capex_prior_ytd": Figure(value=1054.5, row=row(text, "Purchases of property and equipment")),
+        "sbc_ytd": Figure(value=137.8, row=row(text, "Share-based compensation expense | 13")),
+        "sbc_prior_ytd": Figure(value=32.1, row=row(text, "Share-based compensation expense | 13")),
+        "revenue_qtr": Figure(value=582.3, row=row(text, "Revenues")),
+        "operating_income_qtr": Figure(value=-175.9, row=row(text, "Loss from operations")),
+        "da_qtr": Figure(value=259.7, row=row(text, "Depreciation and amortization")),
+        "sbc_qtr": Figure(value=102.5, row=row(text, "Share-based compensation expense")),
     }
     return InterimStatements(period_end=date(2026, 6, 30), ytd_months=6, unit_note="$ millions",
                              **(figures | overrides))
@@ -180,6 +186,15 @@ def test_extract_interim_llm_failure(html, settings):
     assert got is None and reason == "LLM failed: boom"
 
 
+def test_latest_quarter_from_the_three_month_columns(text):
+    s, dropped = interim.verify(statements(text), text)
+    assert not dropped
+    q = interim.latest_quarter(s, "1231")
+    assert (q.label, q.start, q.end) == ("Q2 26", date(2026, 4, 1), date(2026, 6, 30))
+    assert q.ebitda == approx(-175.9 + 259.7) and q.adj_ebitda == approx(-175.9 + 259.7 + 102.5)
+    assert interim.latest_quarter(statements(text, da_qtr=Figure()), "1231") is None
+
+
 def test_apply_prefers_principal_from_the_debt_note(text):
     from creditdash.models import Fact, Financials
     fy = Quarter(label="FY25", start=date(2025, 1, 1), end=date(2025, 12, 31), revenue=529.8,
@@ -194,5 +209,6 @@ def test_apply_prefers_principal_from_the_debt_note(text):
         form="6-K", accession=INTERIM, filed=date(2026, 8, 12), primary_doc=EXHIBIT), document=EXHIBIT, html="")
     out = interim.apply(fin(date(2026, 6, 30)), fin(date(2025, 12, 31)), s, source, "1231")
     assert out.total_debt.value == 10041.8 and "8,545.7" in out.total_debt.note
+    assert [q.label for q in out.quarters] == ["Q2 26"]  # the run-rate's quarter
     out = interim.apply(fin(date(2026, 6, 30)), fin(date(2025, 12, 31)), statements(text), source, "1231")
     assert out.total_debt.value == approx(8545.7) and "carrying" in out.total_debt.note

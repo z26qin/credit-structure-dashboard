@@ -116,6 +116,21 @@ def test_new_loan_of_unknown_shape_is_repaid_at_maturity():
     assert p[("Bridge", "2027")] == approx(3500) and p.get(("Bridge", "2H26"), 0) == approx(0)
 
 
+def test_earnings_test_uses_run_rate_adj_ebitda():
+    # A fast grower: TTM EBITDA 500, but the last quarter earned 150 + 30 of stock comp.
+    fin = FIN.model_copy(update={"quarters": [FIN.quarters[-1].model_copy(update={"sbc": 30.0})]})
+    h = run_model(TOY, fin, MKT, SETTINGS).headline
+    e = next(t for t in h.tests if t.key == "ebitda_to_next12m_interest")
+    assert h.earnings == approx(720) and h.earnings_basis == "run-rate adj. EBITDA (Q2 26 × 4)"
+    assert e.value == approx(720 / h.next12m_interest) and "run-rate adj. EBITDA $720M (Q2 26 × 4)" in e.detail
+
+
+def test_earnings_test_falls_back_to_ttm_without_quarters():
+    fin = FIN.model_copy(update={"quarters": []})
+    h = run_model(TOY, fin, MKT, SETTINGS).headline
+    assert h.earnings == approx(500) and h.earnings_basis == "EBITDA (TTM)"
+
+
 def test_scenarios(out):
     s = {(r.scenario, r.period): r.ebitda for r in out.scenarios}
     assert s[("ttm", "2H26")] == approx(250) and s[("ttm", "2027")] == approx(500)
@@ -222,8 +237,10 @@ def test_headline_tests_and_statuses(out):
     assert [x.key for x in out.headline.tests] == [
         "ebitda_to_next12m_interest", "cfo_plus_interest_to_interest", "fcf_plus_interest_to_interest",
         "liquidity_to_next12m_debt_service"]
-    assert t["ebitda_to_next12m_interest"].value == approx(500 / 61.125, abs=0.01)
+    # Earnings: the latest quarter's EBITDA (150) × 4; the toy reports no stock comp, so not "adj."
+    assert t["ebitda_to_next12m_interest"].value == approx(600 / 61.125, abs=0.01)
     assert t["ebitda_to_next12m_interest"].status == "covered"
+    assert t["ebitda_to_next12m_interest"].detail.startswith("run-rate EBITDA $600M (Q2 26 × 4; no stock comp")
     assert t["cfo_plus_interest_to_interest"].value == approx((240 + 18) / 61.125, abs=0.01)
     assert t["fcf_plus_interest_to_interest"].value == approx((240 + 18 - 200) / 61.125, abs=0.01)
     assert t["fcf_plus_interest_to_interest"].status == "not_covered"

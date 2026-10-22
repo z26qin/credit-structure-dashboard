@@ -19,12 +19,12 @@ from . import llm
 from .config import Settings
 from .edgar import Edgar, archive_url
 from .errors import LlmError, SecError
-from .facts import quarter_label
+from .facts import _month_end_shift, quarter_label
 from .footnote import debt_note_from_html, html_to_text
 from .models import Fact, Filing, Financials, Quarter
 from .reconcile import normalize
 
-PROMPT_VERSION = "interim_v2"
+PROMPT_VERSION = "interim_v3"
 PROMPT_FILE = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 MAX_SCAN = 12  # 6-Ks to open, newest first, looking for statements
 MAX_DEBT_6KS = 10  # kept
@@ -66,6 +66,12 @@ class InterimStatements(BaseModel):
     cfo_prior_ytd: Figure = Figure()
     capex_ytd: Figure = Figure()
     capex_prior_ytd: Figure = Figure()
+    sbc_ytd: Figure = Figure()
+    sbc_prior_ytd: Figure = Figure()
+    revenue_qtr: Figure = Figure()  # the three months ending period_end, for the run-rate
+    operating_income_qtr: Figure = Figure()
+    da_qtr: Figure = Figure()
+    sbc_qtr: Figure = Figure()
 
     def figures(self) -> dict[str, Figure]:
         return {k: v for k, v in self if isinstance(v, Figure)}
@@ -209,7 +215,19 @@ def ltm(annual: Quarter, s: InterimStatements, fiscal_year_end: str) -> Quarter:
     return Quarter(label=f"LTM {quarter_label(end, fiscal_year_end)}", start=start, end=end,
                    revenue=roll("revenue"), operating_income=roll("operating_income"), da=roll("da", True),
                    interest_expense=roll("interest_expense", True), interest_paid=None, cfo=roll("cfo"),
-                   capex=roll("capex", True))
+                   capex=roll("capex", True), sbc=roll("sbc", True))
+
+
+def latest_quarter(s: InterimStatements, fiscal_year_end: str) -> Quarter | None:
+    """The three months ending at the period end, from the three-month columns: the run-rate's quarter."""
+    oi, da = s.operating_income_qtr.value, s.da_qtr.value
+    if oi is None or da is None:
+        return None
+    end, sbc = s.period_end, s.sbc_qtr.value
+    return Quarter(label=quarter_label(end, fiscal_year_end), start=_month_end_shift(end, -3) + timedelta(days=1),
+                   end=end, revenue=s.revenue_qtr.value,
+                   operating_income=oi, da=abs(da), interest_expense=None, interest_paid=None, cfo=None, capex=None,
+                   sbc=None if sbc is None else abs(sbc))
 
 
 def apply(base: Financials, annual: Financials, s: InterimStatements, source: InterimSource,
@@ -245,6 +263,6 @@ def apply(base: Financials, annual: Financials, s: InterimStatements, source: In
         "fin_lease": from_20f(annual.fin_lease),
         "rpo": from_20f(annual.rpo),
         "shares_outstanding": annual.shares_outstanding,
-        "quarters": [],
+        "quarters": [q] if (q := latest_quarter(s, fiscal_year_end)) else [],
         "ttm": ttm,
     })

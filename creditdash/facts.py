@@ -26,6 +26,7 @@ FIELDS: dict[str, list[tuple[str, ...]]] = {
     "interest_paid": [("InterestPaidNet",), ("InterestPaid",)],
     "interest_capitalized": [("InterestCostsCapitalized",)],
     "cfo": [("NetCashProvidedByUsedInOperatingActivities",)],
+    "sbc": [("ShareBasedCompensation",), ("AllocatedShareBasedCompensationExpense",)],
     "capex": [("PaymentsToAcquirePropertyPlantAndEquipment",), ("PaymentsToAcquireProductiveAssets",),
               ("PaymentsToAcquireOtherPropertyPlantAndEquipment",), ("PaymentsForCapitalImprovements",)],
 }
