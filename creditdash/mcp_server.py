@@ -155,6 +155,8 @@ def create_server(settings_fn: Callable[[], Settings] = Settings.from_env, build
 
     async def build(ticker: str, ctx: Context, refresh: bool = False, no_llm: bool = False) -> Path:
         s = settings()
+        if not no_llm and (problem := s.llm_key_problem()):
+            raise ToolError(f"{problem} In Claude Desktop, fix it in Settings → Extensions → creditdash.")
         if not no_llm and not s.llm_api_key:
             no_llm = True  # without a key the pipeline would fail at extract: build the SEC totals instead
         total = len(pipeline.STAGES)

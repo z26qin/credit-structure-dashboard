@@ -121,3 +121,11 @@ def test_uses_llm_schema_when_defined(settings):
     t = Recorder([reply('{"labels": "x"}')])
     llm.ask("q", "", WithSchema, settings=settings, transport=t)
     assert '{"custom": true}' in json.loads(t.requests[0].content)["messages"][0]["content"]
+
+
+@pytest.mark.parametrize("key", ["CRWV 的债务情况怎么样", "sk-abc”", "sk-abc def"])
+def test_key_that_cannot_be_a_header_is_named_not_sent(settings, key):
+    t = Recorder([])
+    with pytest.raises(LlmError, match="does not look like an API key") as e:
+        llm.ask("q", "", Labels, settings=with_settings(settings, llm_api_key=key), transport=t)
+    assert key not in str(e.value) and t.requests == []

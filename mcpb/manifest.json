@@ -44,7 +44,7 @@
     "llm_api_key": {
       "type": "string",
       "title": "DeepSeek API key (optional)",
-      "description": "Reads the debt note into an instrument list and writes the market read. Without it you get SEC totals only. About $0.01-0.03 per new filing.",
+      "description": "Just the key (it starts with sk-), from platform.deepseek.com. It reads the debt note into an instrument list and writes the market read; without it you get SEC totals only. About $0.01-0.03 per new filing.",
       "sensitive": true,
       "required": false
     },

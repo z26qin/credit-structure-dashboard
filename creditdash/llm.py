@@ -39,6 +39,8 @@ def ask(prompt: str, system: str, schema: type[BaseModel], *, settings: Settings
         transport: httpx.BaseTransport | None = None, use_cache: bool = True) -> tuple[BaseModel, dict]:
     if not settings.llm_api_key:
         raise LlmError("LLM_API_KEY not set (see .env.example)")
+    if problem := settings.llm_key_problem():
+        raise LlmError(problem)
     start = time.time()
     request = build_request(prompt, system, schema, settings.llm_model, settings.llm_reasoning_effort)
     chars = sum(len(m["content"]) for m in request["messages"])

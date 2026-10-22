@@ -186,3 +186,12 @@ def test_main_expands_the_data_folder(tmp_path, monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "${user_config.llm_api_key}")
     mcp_server.main()
     assert stub.cwd == (tmp_path / "creditdash").resolve() and "LLM_API_KEY" not in os.environ
+
+
+def test_bad_key_fails_fast_with_where_to_fix_it(settings, build, opened):
+    r = call(make(settings, build, opened, llm_api_key="CRWV 的债务情况怎么样"), "credit_snapshot", {"ticker": "CRWV"})
+    assert r.is_error and "does not look like an API key" in r.content[0].text and "Extensions" in r.content[0].text
+    assert "的" not in r.content[0].text and not build.calls
+    ok = call(make(settings, build, opened, llm_api_key="CRWV 的债务情况怎么样"), "credit_snapshot",
+              {"ticker": "CRWV", "no_llm": True})
+    assert not ok.is_error  # SEC totals still work

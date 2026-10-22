@@ -53,6 +53,15 @@ class Settings:
                               "The SEC requires a User-Agent with a contact email.")
         return self.sec_user_agent
 
+    def llm_key_problem(self) -> str | None:
+        """Why LLM_API_KEY cannot be sent in an HTTP header, or None. The key itself is never echoed."""
+        key = self.llm_api_key or ""
+        bad = [i for i, c in enumerate(key) if not c.isascii() or c.isspace()]
+        if not bad:
+            return None
+        return (f"LLM_API_KEY does not look like an API key: {len(bad)} of its {len(key)} characters are spaces "
+                f"or non-ASCII (the first at position {bad[0] + 1}). Paste just the key, e.g. sk-...")
+
 
 class ModelSettings(BaseModel):
     stress_haircut: float = 0.30
