@@ -179,7 +179,7 @@ def _foreign(resolved: Resolved, edgar: Edgar, settings: Settings, companyfacts:
                         "model and checked against the filing text.")
         inputs = _Inputs(financials=interim.apply(base, annual_fin, stmts, source, fye), periodic=periodic,
                          instance="", filing_html=lambda: source.html, annual=filing, annual_instance=instance)
-        after, exclude = source.filing.filed, {source.filing.accession}
+        after, exclude = stmts.period_end, {source.filing.accession}  # from the period end, as for 8-Ks
     else:
         cache = cache_root / str(company.cik) / filing.accession
         inputs = _Inputs(financials=annual_fin, periodic=filing, instance=instance,

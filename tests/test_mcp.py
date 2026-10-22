@@ -65,8 +65,20 @@ def test_snapshot_is_compact_json(settings):
     json.dumps(s)
     assert s["company"]["ticker"] == "CRWV" and s["filing"]["period_end"] == "2026-06-30"
     assert s["can_it_pay_interest"]["bottom_line"] and len(s["can_it_pay_interest"]["tests"]) == 4
-    assert {"name", "seniority", "principal", "rate", "maturity", "verified"} <= set(s["instruments"][0])
+    assert {"name", "seniority", "principal_at_period_end", "post_period_change", "balance_pro_forma", "rate",
+            "maturity", "verified"} <= set(s["instruments"][0])
     assert "debt_service" not in json.dumps(s)  # the monthly schedules stay on the page
+
+
+def test_snapshot_instruments_add_up_to_the_stack():
+    # The stack is pro forma: a reader summing period-end principal alone would miss post-period changes.
+    toy = sample_dashboard().instruments
+    toy[-1] = toy[-1].model_copy(update={"post_period_change": 4200.0})
+    s = snapshot(sample_dashboard(instruments=toy))
+    stack = {c["class"]: c["amount"] for c in s["capital_stack"]["classes"]}
+    conv = [i for i in s["instruments"] if i["seniority"] == "Convertible"]
+    assert sum(i["balance_pro_forma"] for i in conv) == pytest.approx(stack["Convertible"])
+    assert sum(i["principal_at_period_end"] for i in conv) == pytest.approx(stack["Convertible"] - 4200)
 
 
 def test_credit_snapshot_builds_and_reports_progress(settings, build, opened):

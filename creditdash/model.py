@@ -310,19 +310,22 @@ def _simulate(loans: list[_Loan], months, label_of) -> tuple[list[ServiceRow], l
                     payments[idx] += amount / len(by_period[label])
             elif mat_idx is not None:
                 payments[mat_idx] += amount
+        # Post-period changes are pro forma at the period end, like the stack: a repayment already made is
+        # not owed again, and new debt is repaid at maturity unless the text says it amortizes (the reported
+        # schedule predates it, so there is nothing to fit its shape to).
         if loan.post > 0:
-            extra = _straight_line(loan, months, label_of, loan.post) if loan.flexible else {
+            spread = loan.inst.amortization == "amortizing"
+            extra = _straight_line(loan, months, label_of, loan.post) if spread else {
                 label_of(loan.maturity): loan.post}
             for label, amount in extra.items():
-                idxs = by_period.get(label) if loan.flexible else ([mat_idx] if mat_idx is not None else [])
+                idxs = by_period.get(label) if spread else ([mat_idx] if mat_idx is not None else [])
                 for idx in idxs or []:
                     payments[idx] += amount / len(idxs)
-        elif loan.post < 0 and months:
+        elif loan.post < 0:
             repay = min(-loan.post, loan.principal)
             scale = (loan.principal - repay) / loan.principal if loan.principal else 0
             payments = [p * scale for p in payments]
-            payments[0] += repay
-        balance = loan.principal + max(loan.post, 0)
+        balance = loan.principal + max(loan.post, -loan.principal)
         for idx, (_, label) in enumerate(months):
             interest = balance * loan.rate / 100 / 12
             paid = min(payments[idx], balance)

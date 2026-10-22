@@ -96,6 +96,26 @@ def test_post_period_draw_scheduled_on_top():
     assert next(s for s in out.stack if s.label == "Convertible").amount == approx(400)
 
 
+def test_post_period_repayment_is_not_owed_again():
+    # Half of C bought back after the period end (with new money the model never sees): it is not a payment
+    # in the coming months, and the rest is still due at maturity.
+    toy = [i.model_copy(update={"post_period_change": -150.0}) if i.name == "C" else i for i in TOY]
+    out = run_model(toy, FIN, MKT, SETTINGS)
+    p = principal_by(out)
+    assert p.get(("C", "2H26"), 0) == approx(0) and p[("C", "2031")] == approx(150)
+    assert out.headline.next12m_principal == approx(run_model(TOY, FIN, MKT, SETTINGS).headline.next12m_principal)
+    assert next(s for s in out.stack if s.label == "Convertible").amount == approx(150)
+
+
+def test_new_loan_of_unknown_shape_is_repaid_at_maturity():
+    # A bridge signed after the period end: nothing at the period end, no stated amortization. The reported
+    # schedule predates it, so it is not spread over the months to maturity.
+    bridge = inst("Bridge", 0, maturity="2027-10", seniority="parent_secured", amortization="unknown",
+                  rate_type="floating", spread=2.75, post=3500.0)
+    p = principal_by(run_model(TOY + [bridge], FIN, MKT, SETTINGS))
+    assert p[("Bridge", "2027")] == approx(3500) and p.get(("Bridge", "2H26"), 0) == approx(0)
+
+
 def test_scenarios(out):
     s = {(r.scenario, r.period): r.ebitda for r in out.scenarios}
     assert s[("ttm", "2H26")] == approx(250) and s[("ttm", "2027")] == approx(500)

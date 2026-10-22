@@ -1,5 +1,8 @@
 """Dashboard -> a compact summary for a model to read: the top card, the debt list and the checks, without the
-monthly schedules the page draws. Money is $ millions, rounded to 0.1; ratios to 0.01."""
+monthly schedules the page draws. Money is $ millions, rounded to 0.1; ratios to 0.01.
+
+Each instrument carries its period-end principal and its post-period change apart, and their sum: the stack and
+the model use the sum, the reconciliation the period-end figure."""
 from __future__ import annotations
 
 from .models import SENIORITY_LABELS, Dashboard, Instrument
@@ -63,14 +66,21 @@ def snapshot(d: Dashboard) -> dict:
         out["reconciliation"]["extraction_skipped"] = d.extraction_skipped
     out["instruments"] = [
         {"name": i.name, "kind": i.kind.value, "seniority": SENIORITY_LABELS[i.seniority_class.value],
-         "principal": _m(i.principal), "commitment": _m(i.commitment), "rate": _rate(i), "maturity": i.maturity,
+         "principal_at_period_end": _m(i.principal), "post_period_change": _m(i.post_period_change),
+         "balance_pro_forma": _m(max((i.principal or 0) + (i.post_period_change or 0), 0)),
+         "commitment": _m(i.commitment), "rate": _rate(i), "maturity": i.maturity,
          "amortization": i.amortization.value, "secured_by": i.security, "verified": i.verified, "source": i.source}
         for i in d.instruments
     ]
     out["maturities"] = {"as_of": fin.maturities_as_of.isoformat() if fin.maturities_as_of else None,
                          "buckets": [{"label": b.label, "principal": _m(b.principal)} for b in fin.maturities]}
-    out["capital_stack"] = [{"class": s.label, "amount": _m(s.amount), "share": _x(s.share),
-                             "attachment": _m(s.attachment)} for s in model.stack]
+    if not fin.maturities:
+        out["maturities"]["note"] = ("The filings tag no maturity schedule (usual for 20-F filers), so each "
+                                     "instrument is repaid at its own maturity per its amortization.")
+    out["capital_stack"] = {
+        "basis": "pro forma: period-end principal plus post-period changes (balance_pro_forma), equity at market cap",
+        "classes": [{"class": s.label, "amount": _m(s.amount), "share": _x(s.share), "attachment": _m(s.attachment)}
+                    for s in model.stack]}
     out["market"] = {
         "price": market.price.value, "market_cap": _m(market.market_cap.value), "sofr_pct": market.sofr_pct.value,
         "cds_5y_bps": market.cds_bps.value, "bond_yields_pct": market.bond_yields, "ratings": market.ratings,

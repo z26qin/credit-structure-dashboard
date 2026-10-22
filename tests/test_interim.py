@@ -133,6 +133,25 @@ def test_debt_filings_keep_only_debt_documents(settings):
     assert "aggregate principal amount" in texts["0001104659-26-112824"]
 
 
+def test_debt_filings_cap_what_is_kept_not_what_is_read(settings, monkeypatch):
+    # Newer 6-Ks without debt must not crowd out an older one with it (the July 2026 loan).
+    monkeypatch.setattr(interim, "MAX_DEBT_6KS", 1)
+    debt_html = "<p>Nebius Compute II entered into a $775 million term loan facility.</p>"
+    files = NBIS_FILES | {
+        f"{ARCHIVE}/000110465926084452/index.json": json.dumps({"directory": {"item": [
+            {"name": "tm2620683d1_6k.htm"}]}}).encode(),
+        f"{ARCHIVE}/000110465926084452/tm2620683d1_6k.htm": debt_html.encode(),
+        f"{ARCHIVE}/000110465926112824/index.json": json.dumps({"directory": {"item": [
+            {"name": "tm2626792d1_6k.htm"}]}}).encode(),
+        f"{ARCHIVE}/000110465926112824/tm2626792d1_6k.htm": b"<p>Annual general meeting results</p>",
+    }
+    edgar = Edgar(settings, transport=FixtureTransport(files))
+    r = resolve("NBIS", edgar)
+    filings, _ = debt_filings(edgar, r.company.cik, r.sixks, after=date(2026, 6, 30), exclude={INTERIM},
+                              cache_root=settings.home / "cache")
+    assert [f.accession for f in filings] == ["0001104659-26-084452"]
+
+
 class FakeAsk:
     def __init__(self, result=None, error=None):
         self.calls, self.result, self.error = [], result, error

@@ -27,7 +27,8 @@ from .reconcile import normalize
 PROMPT_VERSION = "interim_v2"
 PROMPT_FILE = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 MAX_SCAN = 12  # 6-Ks to open, newest first, looking for statements
-MAX_DEBT_6KS = 10
+MAX_DEBT_6KS = 10  # kept
+MAX_SCANNED_6KS = 40  # looked at, newest first
 MAX_DOC_BYTES = 5_000_000
 MAX_STATEMENT_CHARS = 60_000
 MAX_NOTE_CHARS = 30_000
@@ -120,7 +121,9 @@ def debt_filings(edgar: Edgar, cik: int, sixks: list[Filing], after: date, exclu
                  cache_root: Path) -> tuple[list[Filing], dict[str, str]]:
     """6-Ks filed after `after` with a document announcing debt; text kept around the first debt mention."""
     filings, texts = [], {}
-    for filing in [f for f in sixks if f.filed > after and f.accession not in exclude][:MAX_DEBT_6KS]:
+    for filing in [f for f in sixks if f.filed > after and f.accession not in exclude][:MAX_SCANNED_6KS]:
+        if len(filings) == MAX_DEBT_6KS:
+            break
         parts = []
         for _, html in _documents(edgar, cik, filing, cache_root):
             text = html_to_text(html)

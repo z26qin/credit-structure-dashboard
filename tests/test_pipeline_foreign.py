@@ -71,6 +71,19 @@ def test_20f_with_interim_6k(settings, tmp_path, interim_json):
     assert path.parent.name == "2026-06-30"
 
 
+def test_6ks_between_period_end_and_interim_filing_are_read(settings, tmp_path, interim_json):
+    # The interim 6-K is filed 2026-08-12; a loan announced on 2026-07-17 is still after the period end.
+    files = FILES | {
+        f"{ARCHIVE}/000110465926084452/index.json": json.dumps({"directory": {"item": [
+            {"name": "tm2620683d1_6k.htm"}]}}).encode(),
+        f"{ARCHIVE}/000110465926084452/tm2620683d1_6k.htm":
+            b"<p>Nebius Compute II entered into a $775 million term loan facility.</p>",
+    }
+    llm = Llm(interim_json)
+    build(settings, tmp_path, llm, files=files)
+    assert "## 6-K 0001104659-26-084452 filed 2026-07-17" in llm.calls[1][1]
+
+
 def test_20f_annual_only_without_the_model(settings, tmp_path, interim_json):
     llm = Llm(interim_json)
     d, _ = build(settings, tmp_path, llm, no_llm=True)

@@ -85,7 +85,9 @@ ticker → resolve → fetch → facts → extract → reconcile → market → 
   typed instrument list with verbatim quotes.
 - **reconcile**: every quote must appear in the filing text sent; instruments must add up to the reported
   debt (≤1% pass, ≤5% warn, else fail). The gap is drawn as "Unallocated", never filled in.
-- **model**: monthly debt service per instrument, fitted to the reported maturity schedule; EBITDA
+- **model**: post-period changes are pro forma at the period end, as in the capital stack: a repayment
+  already made is not owed again, and new debt is repaid at maturity unless the filing says it amortizes. Then
+  monthly debt service per instrument, fitted to the reported maturity schedule; EBITDA
   scenarios (consensus if given, TTM, run-rate, stress −30%); coverage, cash to raise, capital stack with
   attachment points, and the cash waterfall. Maturities are assumed refinanced at today's average rate
   (`refinancing_rate_pct` in `config/model.yaml` overrides it), so their interest keeps running; capex
@@ -120,8 +122,9 @@ with interim financial statements. If it finds one, the model reads the three st
 (prompt `creditdash/prompts/interim_v2.md`); every figure must sit in a row of the 6-K text that shows the
 number, or it is dropped. The dashboard is then dated at the interim period end: balances and total debt
 (principal per the debt note) from the 6-K, last-twelve-month figures as full year + year to date − the
-prior year to date, and the debt list read from the 6-K's debt note with the 20-F for detail. Later 6-Ks
-that mention debt (offerings, indentures, credit agreements) are read as post-period changes. The banner at
+prior year to date, and the debt list read from the 6-K's debt note with the 20-F for detail. 6-Ks filed
+after the period end that mention debt (offerings, indentures, credit agreements) are read as post-period
+changes, including those filed before the interim 6-K itself. The banner at
 the top of the page says which figures come from which filing. With `--no-llm`, or without such a 6-K,
 the figures stay as of the 20-F.
 
