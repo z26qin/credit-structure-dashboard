@@ -126,10 +126,11 @@ Builds report each stage as MCP progress. A missing ticker, an unsupported filer
 `SEC_USER_AGENT` comes back as a tool error Claude can read. With no `LLM_API_KEY` the server builds
 SEC totals only and says so in `notes`.
 
-**Claude Desktop.** Build the extension and double-click it:
+**Claude Desktop.** Build the extension (it needs Node, for `npx`), then double-click
+`dist/creditdash-<version>.mcpb`:
 
 ```bash
-uv run python scripts/build_mcpb.py   # dist/creditdash-<version>.mcpb; needs Node for npx
+uv run python scripts/build_mcpb.py
 ```
 
 The install screen asks for your name and email (the SEC's User-Agent), an optional DeepSeek key (kept in
