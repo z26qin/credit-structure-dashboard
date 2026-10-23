@@ -36,6 +36,14 @@
     <input id="ticker" name="ticker" placeholder="CRWV" autocomplete="off" maxlength="10" required aria-label="Ticker">
     <button type="submit" id="go">Build</button>
   </form>
+  <div>
+    <p>Or compare two: repayment capacity, cash-flow adequacy and how tight the cash is, side by side.</p>
+  </div>
+  <form id="compare-form">
+    <input id="ticker-a" name="a" placeholder="CRWV" autocomplete="off" maxlength="10" required aria-label="First ticker">
+    <input id="ticker-b" name="b" placeholder="NBIS" autocomplete="off" maxlength="10" required aria-label="Second ticker">
+    <button type="submit" id="go-compare">Compare</button>
+  </form>
   <p id="status" role="status"></p>
   <section>
     <p>Built</p>
@@ -44,20 +52,23 @@
       {% else %}<li><p style="padding:12px 4px">Nothing built yet.</p></li>{% endfor %}
     </ul>
   </section>
+  {% if comparisons %}<section>
+    <p>Compared</p>
+    <ul>
+      {% for c in comparisons %}<li><a href="{{ c.url }}">{{ c.a }} vs {{ c.b }} <span>comparison</span></a></li>{% endfor %}
+    </ul>
+  </section>{% endif %}
 </main>
 <script>
 (function () {
-  const form = document.getElementById("build-form"), input = document.getElementById("ticker");
-  const go = document.getElementById("go"), status = document.getElementById("status");
+  const status = document.getElementById("status");
+  const buttons = [document.getElementById("go"), document.getElementById("go-compare")];
   const say = (text, bad) => { status.textContent = text; status.className = bad ? "is-error" : ""; };
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const ticker = input.value.trim().toUpperCase();
-    if (!ticker) return;
-    go.disabled = true;
-    say("Starting " + ticker + "…");
+  async function run(url, payload, label) {
+    buttons.forEach((b) => { b.disabled = true; });
+    say("Starting " + label + "…");
     try {
-      const r = await fetch("/build", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker }) });
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const body = await r.json();
       if (!r.ok) throw new Error(body.detail || r.statusText);
       for (;;) {
@@ -65,12 +76,23 @@
         const job = await (await fetch("/jobs/" + body.job)).json();
         if (job.status === "done") { window.location.href = job.path; return; }
         if (job.status === "error") throw new Error(job.error);
-        say(ticker + ": " + job.stage + "…");
+        say(label + ": " + job.stage + "…");
       }
     } catch (e) {
       say(String(e.message || e), true);
-      go.disabled = false;
+      buttons.forEach((b) => { b.disabled = false; });
     }
+  }
+  const value = (id) => document.getElementById(id).value.trim().toUpperCase();
+  document.getElementById("build-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const ticker = value("ticker");
+    if (ticker) run("/build", { ticker }, ticker);
+  });
+  document.getElementById("compare-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const a = value("ticker-a"), b = value("ticker-b");
+    if (a && b) run("/compare", { a, b }, a + " vs " + b);
   });
 })();
 </script>

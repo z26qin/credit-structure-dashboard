@@ -31,6 +31,8 @@
   "tools": [
     {"name": "credit_snapshot", "description": "Build a company's dashboard from its latest SEC filings and return a compact summary: interest coverage, debt instruments, maturities, capital stack, market read."},
     {"name": "show_dashboard", "description": "Show the full interactive dashboard in the chat, or open it in the browser."},
+    {"name": "compare_credit", "description": "Compare two companies' repayment capacity, cash-flow adequacy and cash-flow tightness, with the stronger side named per measure."},
+    {"name": "show_comparison", "description": "Show the two-company comparison page in the chat, or open it in the browser."},
     {"name": "set_market_inputs", "description": "Save bond yields, 5-year CDS, ratings, consensus or price that the filings don't have."},
     {"name": "list_dashboards", "description": "List the dashboards built so far."}
   ],

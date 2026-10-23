@@ -103,6 +103,7 @@ cp .env.example .env   # then fill it in
 uv run creditdash build CRWV            # writes out/CRWV/<period end>/index.html
 uv run creditdash build CRWV --no-llm   # no model calls: SEC totals only, no 6-K figures, no market read
 uv run creditdash build CRWV --refresh  # ignore cached SEC files and cached model answers
+uv run creditdash compare CRWV NBIS     # builds both, writes out/_compare/CRWV_vs_NBIS/index.html
 uv run creditdash serve --port 8777     # local page with a ticker box (binds 127.0.0.1)
 uv run creditdash list
 ```
@@ -119,6 +120,8 @@ cash-flow side only.
 |---|---|
 | `credit_snapshot(ticker)` | Builds the dashboard (from cache when it can) and returns a compact JSON summary for Claude to answer from: the four coverage tests and bottom line, balance sheet, TTM, every instrument, maturities, capital stack, market read |
 | `show_dashboard(ticker, period?)` | Shows the full page in the chat where the client renders MCP Apps; otherwise opens it in the browser |
+| `compare_credit(ticker_a, ticker_b)` | Builds both and returns the comparison as JSON: each company's verdict and four tests, every measure for both with the stronger side named, and a tally per section |
+| `show_comparison(ticker_a, ticker_b)` | Shows the comparison page, in the chat or the browser like `show_dashboard` |
 | `set_market_inputs(ticker, ...)` | Writes bond yields, 5-year CDS, ratings, consensus or price to `overrides/<TICKER>.yaml`, merging with what is there (YAML comments are not kept) |
 | `list_dashboards()` | The dashboards built so far |
 
@@ -144,6 +147,32 @@ claude mcp add creditdash -- uv run --directory "$PWD" creditdash mcp
 ```
 
 Set `CREDITDASH_ROOT` to keep the data elsewhere; the server changes to that folder at start.
+
+## Comparing two companies
+
+`creditdash compare A B` (or the second form on the local page, or `compare_credit` from Claude) puts two
+companies side by side on three questions: **repayment capacity** (can each pay its interest and principal),
+**cash-flow adequacy** (how much of what it must fund does its own cash cover) and **cash-flow tightness** (how long
+does liquidity last without new money). Companies differ in size and fiscal year, so every figure is a ratio or a
+share of the company's own liquidity or debt, and every series sits on one calendar axis at each company's own
+period ends.
+
+No filing is read again: `compare.py` reads the two built `dashboard.json` files, so both sides go through the same
+coverage tests, debt-service model and refinancing assumption. The page:
+
+| View | What it shows | From the single-ticker page |
+|---|---|---|
+| Verdict | each company's funding label, bottom line and four tests; a bar per section counting the measures each is stronger on | the top card |
+| Coverage tests | the four multiples as a dumbbell per test, over the not covered / thin / covered zones | the top card's tests |
+| Coverage, year by year | EBITDA ÷ interest (maturities refinanced) or ÷ interest + principal, scenarios both builds have | the coverage chart |
+| Cash-flow adequacy | TTM operating cash flow against TTM capex + principal due in 12 months, needs scaled to 100% | new |
+| Last eight quarters | cash interest cover and free-cash-flow margin per quarter | new |
+| Runway | liquidity left at each period end as a share of today's, maturities paid or refinanced, and when it runs out | cash to raise, turned into a balance |
+| Maturity profile | cumulative share of today's debt falling due | the payout wall, normalized |
+| Every measure | both values, the stronger side (within 5% is even), how each is computed; size rows as context | the headline figures |
+
+The capital stack, yields, debt by rate, the cash waterfall and the instrument table stay on each company's own
+dashboard, which the comparison links to: they are about recovery and pricing, not repayment or cash.
 
 ## How it works
 
@@ -171,6 +200,8 @@ ticker → resolve → fetch → facts → extract → reconcile → market → 
   probability a 5-year CDS or the worst bond's yield over SOFR implies, and the model's read of price
   against cash flow.
 - **render**: one template, data and d3 inlined. Every number names its source in "Sources and method".
+- **compare** (`compare.py`): two built dashboards in, one page out (`out/_compare/<A>_vs_<B>/`); see
+  "Comparing two companies".
 
 ## Where the model is used
 
