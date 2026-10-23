@@ -386,3 +386,75 @@ class Dashboard(BaseModel):
     settings: dict
     risk: RiskView | None = None
     basis: list[str] = []  # where each part of the figures comes from, when that needs saying (20-F filers)
+
+
+# --- two-ticker comparison (compare.py) ------------------------------------------------------
+
+Section = Literal["repayment", "adequacy", "tightness", "context", "market"]
+
+
+class Measure(BaseModel):
+    """One measure for both companies. Ratios are plain fractions (unit "pct" is shown ×100)."""
+    key: str
+    section: Section
+    label: str
+    unit: Literal["x", "pct", "months", "years", "usd", "bps"]
+    better: Literal["higher", "lower"] | None  # None: context, not compared
+    a: float | None
+    b: float | None
+    a_note: str = ""  # why a value is missing, or what stands in for it ("net cash", "not within the modeled years")
+    b_note: str = ""
+    stronger: Literal["a", "b", "even"] | None = None
+    detail: str
+
+
+class PathPoint(BaseModel):
+    """One modeled period, dated so two fiscal calendars share an axis."""
+    period: str
+    end: date
+    months: int
+    icr_refi: dict[str, float | None] = {}  # by scenario
+    dscr: dict[str, float | None] = {}
+    liquidity_paid: float | None = None  # liquidity at period end ÷ today's, no new money, maturities paid
+    liquidity_refinanced: float | None = None  # the same with maturities refinanced (their interest paid instead)
+    due_cumulative: float | None = None  # principal of today's debt due by period end ÷ today's debt
+
+
+class QuarterPoint(BaseModel):
+    label: str
+    end: date
+    cash_interest_cover: float | None  # (CFO + interest paid) ÷ interest paid
+    fcf_margin: float | None  # (CFO − capex) ÷ revenue
+
+
+class Side(BaseModel):
+    ticker: str
+    name: str
+    cik: int
+    form: str
+    accession: str
+    primary_doc: str
+    filed: date
+    period_end: date
+    built_at: datetime
+    reconciliation: str
+    funding: str | None
+    bottom_line: str
+    tests: list[CoverageTest]
+    liquidity: float | None
+    cfo: float | None  # TTM
+    capex: float | None  # TTM
+    next12m_principal: float | None
+    path: list[PathPoint]
+    quarters: list[QuarterPoint]
+    notes: list[str] = []
+
+
+class Comparison(BaseModel):
+    built_at: datetime
+    a: Side
+    b: Side
+    scenarios: list[str]  # EBITDA scenarios both companies have
+    measures: list[Measure]
+    tally: dict[str, dict[str, int]]  # section -> {"a": n, "b": n, "even": n}
+    notes: list[str] = []

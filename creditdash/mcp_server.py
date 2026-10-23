@@ -1,8 +1,9 @@
 """`creditdash mcp`: the pipeline as an MCP server over stdio, for Claude Desktop (.mcpb) and Claude Code.
 
 Tools: credit_snapshot (build, then a compact summary), show_dashboard (the page, in the chat where the client
-renders MCP Apps, else in the browser), set_market_inputs (overrides/<TICKER>.yaml) and list_dashboards.
-dashboard_html is for the viewer only: it hands the built page to the iframe.
+renders MCP Apps, else in the browser), compare_credit and show_comparison (two tickers side by side),
+set_market_inputs (overrides/<TICKER>.yaml) and list_dashboards. dashboard_html and comparison_html are for the
+viewer only: they hand the built page to the iframe.
 
 Relative paths (.env, overrides/, config/, out/, .creditdash/) resolve against CREDITDASH_ROOT when it is set.
 """
@@ -29,7 +30,9 @@ from . import pipeline
 from .config import Settings
 from .errors import ConfigError, CreditdashError
 from .market import load_overrides
+from .compare import summary
 from .models import Dashboard
+from .render import comparison_folder
 from .snapshot import snapshot
 from .web import PERIOD, TICKER
 
@@ -40,6 +43,8 @@ INSTRUCTIONS = """creditdash reads a company's latest SEC filings (10-K/10-Q, or
 a credit-structure dashboard: who it owes, in what order, when it comes due, and whether cash flow covers it.
 Money is in $ millions. Start with credit_snapshot(ticker) and answer from its fields; call show_dashboard when
 the user wants to see the page. A first build of a filing takes 30-80 s; rebuilds come from cache in seconds.
+To weigh two companies against each other (repayment capacity, cash-flow adequacy, how tight the cash is), call
+compare_credit(ticker_a, ticker_b), and show_comparison for the page.
 Bond yields, 5-year CDS, ratings, consensus and price are not in the filings: when the user gives them, save
 them with set_market_inputs and call credit_snapshot again. Each instrument's "verified" says whether its quotes
 were found in the filing text; "reconciliation" says whether the instruments add up to the reported debt."""
@@ -68,10 +73,13 @@ VIEW_HTML = """<!doctype html>
   async function show(result) {
     const s = (result && result.structuredContent) || {};
     if (result && result.isError) { status(((result.content || [])[0] || {}).text || "The build failed."); size(); return; }
-    if (!s.ticker || !s.period) { status("No dashboard in this result."); size(); return; }
-    status(`Loading ${s.ticker} ${s.period}…`);
+    const pair = s.ticker_a && s.ticker_b;
+    if (!pair && (!s.ticker || !s.period)) { status("No dashboard in this result."); size(); return; }
+    status(pair ? `Loading ${s.ticker_a} vs ${s.ticker_b}…` : `Loading ${s.ticker} ${s.period}…`);
     try {
-      const r = await request("tools/call", { name: "dashboard_html", arguments: { ticker: s.ticker, period: s.period } });
+      const r = await request("tools/call", pair
+        ? { name: "comparison_html", arguments: { ticker_a: s.ticker_a, ticker_b: s.ticker_b } }
+        : { name: "dashboard_html", arguments: { ticker: s.ticker, period: s.period } });
       const html = ((r && r.content) || [])[0];
       if (!html || r.isError) throw new Error((html && html.text) || "no page returned");
       document.open();
@@ -177,6 +185,17 @@ def create_server(settings_fn: Callable[[], Settings] = Settings.from_env, build
         await ctx.report_progress(total, total, f"{ticker}: done")
         return path
 
+    async def newest_or_build(ticker: str, ctx: Context) -> Path:
+        paths = built(settings_fn().out, ticker)
+        return paths[-1] if paths else await build(ticker, ctx)
+
+    def present(path: Path, ctx: Context, open_in_browser: bool | None) -> tuple[str, bool, bool]:
+        """Where the page went: (file URL, shown in the chat, opened in the browser)."""
+        in_chat = client_supports_apps(ctx)
+        url = path.resolve().as_uri()
+        opened = (open_in_browser if open_in_browser is not None else not in_chat) and bool(open_browser(url))
+        return url, in_chat, opened
+
     @apps.tool(resource_uri=VIEW_URI, title="Show dashboard",
                annotations=ToolAnnotations(read_only_hint=False, idempotent_hint=True, open_world_hint=True))
     async def show_dashboard(ticker: str, ctx: Context, period: str | None = None,
@@ -198,11 +217,8 @@ def create_server(settings_fn: Callable[[], Settings] = Settings.from_env, build
                 raise ToolError(f"No {t} dashboard for period {period!r}. Built periods: {have}.")
             path = s.out / t / period / "index.html"
         else:
-            paths = built(s.out, t)
-            path = paths[-1] if paths else await build(t, ctx)
-        in_chat = client_supports_apps(ctx)
-        url = path.resolve().as_uri()
-        opened = (open_in_browser if open_in_browser is not None else not in_chat) and bool(open_browser(url))
+            path = await newest_or_build(t, ctx)
+        url, in_chat, opened = present(path, ctx, open_in_browser)
         d = load_dashboard(path)
         where = [w for w, on in (("shown in the chat", in_chat), ("opened in the browser", opened)) if on]
         text = (f"{d.company.name} ({t}) dashboard for the period ended {path.parent.name}, built "
@@ -221,6 +237,44 @@ def create_server(settings_fn: Callable[[], Settings] = Settings.from_env, build
         path = settings_fn().out / t / period / "index.html"
         if not PERIOD.match(period) or not path.is_file():
             raise ToolError(f"No {t} dashboard for period {period!r}.")
+        return path.read_text()
+
+    @apps.tool(resource_uri=VIEW_URI, title="Show comparison",
+               annotations=ToolAnnotations(read_only_hint=False, idempotent_hint=True, open_world_hint=True))
+    async def show_comparison(ticker_a: str, ticker_b: str, ctx: Context,
+                              open_in_browser: bool | None = None) -> CallToolResult:
+        """Show the page that compares two companies: the four coverage tests side by side, coverage year by year,
+        operating cash flow against capex and principal, the last eight quarters, liquidity runway and the
+        maturity profile. Uses each ticker's newest build, building the ones that are missing.
+
+        Args:
+            ticker_a: e.g. CRWV.
+            ticker_b: e.g. NBIS.
+            open_in_browser: also open the page in the default browser. Default: only when this client
+                cannot show it in the chat.
+        """
+        a, b = normalize_ticker(ticker_a), normalize_ticker(ticker_b)
+        index_a, index_b = await newest_or_build(a, ctx), await newest_or_build(b, ctx)
+        path, c = pipeline.compare_builds(index_a, index_b, settings_fn().out)
+        url, in_chat, opened = present(path, ctx, open_in_browser)
+        where = [w for w, on in (("shown in the chat", in_chat), ("opened in the browser", opened)) if on]
+        text = (f"{c.a.name} ({c.a.ticker}, period ended {c.a.period_end}) vs {c.b.name} ({c.b.ticker}, period ended "
+                f"{c.b.period_end})" + (f", {' and '.join(where)}" if where else "") + f". File: {url}")
+        return CallToolResult(content=[TextContent(type="text", text=text)],
+                              structured_content={"ticker_a": c.a.ticker, "ticker_b": c.b.ticker,
+                                                  "path": str(path.resolve()), "url": url, "shown_in_chat": in_chat,
+                                                  "opened_in_browser": opened})
+
+    @apps.tool(resource_uri=VIEW_URI, visibility=["app"], structured_output=False,
+               annotations=ToolAnnotations(read_only_hint=True))
+    def comparison_html(ticker_a: str, ticker_b: str, ctx: Context) -> str:
+        """For the dashboard viewer only (returns the whole comparison page's HTML). Use show_comparison instead."""
+        if not client_supports_apps(ctx):
+            raise ToolError("comparison_html is for the dashboard viewer. Use show_comparison instead.")
+        a, b = normalize_ticker(ticker_a), normalize_ticker(ticker_b)
+        path = comparison_folder(settings_fn().out, a, b) / "index.html"
+        if not path.is_file():
+            raise ToolError(f"No {a} vs {b} comparison built. Use show_comparison.")
         return path.read_text()
 
     apps.add_html_resource(VIEW_URI, VIEW_HTML.replace("SIZE_SCRIPT", js_string(SIZE_SCRIPT)),
@@ -247,6 +301,34 @@ def create_server(settings_fn: Callable[[], Settings] = Settings.from_env, build
         if not no_llm and not settings().llm_api_key:
             out["notes"] = ["No LLM_API_KEY is set, so this is SEC totals only: no instrument list, no 6-K figures, "
                             "no market read. Add a DeepSeek key in the extension settings for the full build."]
+        return out
+
+    @server.tool(title="Compare two companies", structured_output=True,
+                 annotations=ToolAnnotations(read_only_hint=False, idempotent_hint=True, open_world_hint=True))
+    async def compare_credit(ticker_a: str, ticker_b: str, ctx: Context, refresh: bool = False,
+                             no_llm: bool = False) -> dict[str, Any]:
+        """Compare two companies' repayment capacity, cash-flow adequacy and cash-flow tightness. Builds both
+        dashboards (from cache when it can) and returns, per company, the funding verdict, bottom line and the four
+        coverage tests; then every measure for both with the stronger side named (coverage multiples, net debt ÷
+        EBITDA, operating cash flow against capex and principal, free cash flow ÷ debt, liquidity runway with
+        maturities paid or refinanced, principal due in 12 months, floating-rate share), a tally per section, and
+        notes such as differing period ends. Ratios only, so size does not decide it.
+
+        Args:
+            ticker_a: US-listed ticker, e.g. CRWV.
+            ticker_b: e.g. NBIS.
+            refresh: re-download SEC files and re-ask the model instead of using the cache.
+            no_llm: skip model calls (SEC totals only, no instrument list).
+        """
+        a, b = normalize_ticker(ticker_a), normalize_ticker(ticker_b)
+        index_a = await build(a, ctx, refresh=refresh, no_llm=no_llm)
+        index_b = await build(b, ctx, refresh=refresh, no_llm=no_llm)
+        path, c = pipeline.compare_builds(index_a, index_b, settings_fn().out)
+        out = summary(c)
+        out["comparison"] = {"ticker_a": c.a.ticker, "ticker_b": c.b.ticker, "path": str(path.resolve())}
+        if not no_llm and not settings().llm_api_key:
+            out.setdefault("notes", []).append("No LLM_API_KEY is set, so both builds are SEC totals only: no "
+                                               "instrument list, so no floating-rate share.")
         return out
 
     @server.tool(title="List dashboards", annotations=ToolAnnotations(read_only_hint=True))

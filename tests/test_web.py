@@ -86,3 +86,20 @@ def test_rejects_traversal(settings, client):
     for path in ["/d/..%2F..%2Fetc/passwd", "/d/CRWV/../../secret.txt", "/d/..%2F/secret.txt", "/d/CRWV/2026-06-31x"]:
         r = client.get(path)
         assert r.status_code == 404 and "secret" not in r.text, path
+
+
+def test_compare_job_flow(client):
+    r = client.post("/compare", json={"a": "crwv", "b": "nbis"})
+    assert r.status_code == 200
+    job = wait_done(client, r.json()["job"])
+    assert job["status"] == "done" and job["path"] == "/c/CRWV/NBIS" and job["stage"] == "NBIS: render"
+    page = client.get(job["path"])
+    assert page.status_code == 200 and "comparison-data" in page.text and 'data-web="/d/CRWV/2026-06-30"' in page.text
+    assert "/c/CRWV/NBIS" in client.get("/").text
+
+
+def test_compare_errors(client):
+    assert client.post("/compare", json={"a": "CRWV"}).status_code == 400
+    job = wait_done(client, client.post("/compare", json={"a": "CRWV", "b": "ZZZZZ"}).json()["job"])
+    assert job["status"] == "error" and "ZZZZZ" in job["error"]
+    assert client.get("/c/CRWV/ZZZZZ").status_code == 404 and client.get("/c/..%2F/x").status_code == 404

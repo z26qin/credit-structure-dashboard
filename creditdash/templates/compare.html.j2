@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ c.a.ticker }} vs {{ c.b.ticker }} credit comparison</title>
+<style>{{ css }}</style>
+</head>
+<body>
+<main class="cw">
+  <header class="cw-head" id="overview">
+    <p class="cw-kicker">Credit comparison · {{ c.a.name }} and {{ c.b.name }}</p>
+    <h1 class="cw-title">{{ c.a.ticker }} vs {{ c.b.ticker }}: can each pay, and how tight is the cash</h1>
+    <p class="cw-note">Three questions, both companies on the same scale: repayment capacity, cash-flow adequacy and cash-flow tightness. Every figure is a ratio or a share of the company's own liquidity or debt, so size does not decide it; time runs on one calendar axis, each company at its own period ends. Money in US dollars; built {{ c.built_at.strftime("%Y-%m-%d %H:%M") }}.</p>
+    {% for line in c.notes %}<p class="cw-banner">{{ line }}</p>{% endfor %}
+  </header>
+
+  {% set STATUS = {"covered": "Covered", "thin": "Thin", "not_covered": "Not covered", "n/a": "No data"} %}
+  {% set SECTION = {"repayment": "Repayment capacity", "adequacy": "Cash-flow adequacy", "tightness": "Cash-flow tightness"} %}
+  <section class="cx-verdict" id="verdict" aria-label="Verdict per company">
+    <div class="cx-cols">
+      {% for key, s in (("a", c.a), ("b", c.b)) %}
+      <div class="cx-col is-{{ key }}">
+        <div class="cx-ticker"><span class="cx-dot"></span>{{ s.ticker }}<span class="cx-name">{{ s.name }}</span></div>
+        <p class="cw-note">{{ s.form }} for the period ended {{ s.period_end }}, filed {{ s.filed }} · <span class="cw-badge is-{{ s.reconciliation }}">Reconciliation: {{ s.reconciliation }}</span> · <a class="cx-open" href="../../{{ s.ticker }}/{{ s.period_end }}/index.html" data-web="/d/{{ s.ticker }}/{{ s.period_end }}">full dashboard</a></p>
+        {% if s.funding or s.bottom_line %}<p class="cx-bottom">{% if s.funding %}<b>{{ s.funding }}.</b> {% endif %}{{ s.bottom_line }}</p>{% endif %}
+        <div class="cw-tests">
+          {% for t in s.tests %}
+          <div class="cw-test">
+            <span class="cw-kpi-label">{{ t.label }}</span>
+            <span class="cx-test-value">{{ "%.1fx"|format(t.value) if t.value is not none else "—" }}</span>
+            <span class="cw-status is-{{ t.status }}">{{ STATUS[t.status] }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% for line in s.notes %}<p class="cw-info">{{ line }}</p>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="cx-score" aria-label="Measures each company is stronger on">
+      {% for sec, t in c.tally.items() %}{% set n = t.a + t.b + t.even %}
+      <div class="cx-score-row">
+        <span class="cx-score-label">{{ SECTION[sec] }}</span>
+        <span class="cx-score-bar" role="img" aria-label="{{ c.a.ticker }} {{ t.a }}, {{ c.b.ticker }} {{ t.b }}, even {{ t.even }}">
+          {% if n %}{% if t.a %}<span class="is-a" style="flex: {{ t.a }}"></span>{% endif %}{% if t.even %}<span class="is-even" style="flex: {{ t.even }}"></span>{% endif %}{% if t.b %}<span class="is-b" style="flex: {{ t.b }}"></span>{% endif %}{% endif %}
+        </span>
+        <span class="cx-score-text">{% if not n %}no measure both have{% elif t.a > t.b %}{{ c.a.ticker }} stronger on {{ t.a }} of {{ n }}{% elif t.b > t.a %}{{ c.b.ticker }} stronger on {{ t.b }} of {{ n }}{% else %}split, {{ t.a }}–{{ t.b }}{% endif %}{% if n and t.even %} ({{ t.even }} even){% endif %}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="cw-note">Each bar counts the measures in the table below that one company is stronger on (values within 5% are even). Covered: 2.0x or more (liquidity 1.5x); thin: 1.0x or more.</p>
+  </section>
+
+  <h2 class="cw-h2">1 · Repayment capacity: can each pay its interest and principal?</h2>
+  <div class="cw-grid">
+    <section class="cw-card" id="tests">
+      <h3>The four coverage tests, side by side</h3>
+      <p class="cw-note">Each test's multiple for the next 12 months. Shading marks not covered (below 1.0x), thin and covered (2.0x; liquidity 1.5x). The axis is compressed away from zero so the thresholds and the outliers both fit; beyond ±50x a value sits at the edge with an arrow.</p>
+      <div class="cw-chart" id="tests-chart"></div>
+      <div class="cw-legend" id="tests-legend"></div>
+    </section>
+    <section class="cw-card" id="coverage-path">
+      <h3>Coverage, year by year</h3>
+      <div class="cw-controls">
+        <div class="cw-seg" role="group" aria-label="EBITDA scenario" id="scenario-ctl"></div>
+        <div class="cw-seg" role="group" aria-label="What coverage counts" id="cover-ctl"></div>
+      </div>
+      <p class="cw-note" id="coverage-note"></p>
+      <div class="cw-chart" id="coverage-chart"></div>
+      <div class="cw-legend" id="coverage-legend"></div>
+    </section>
+  </div>
+
+  <h2 class="cw-h2">2 · Cash-flow adequacy: how much of what it must fund does its own cash cover?</h2>
+  <div class="cw-grid">
+    <section class="cw-card" id="adequacy">
+      <h3>Operating cash flow against capex and principal due</h3>
+      <p class="cw-note">Each company's needs (TTM capex plus principal due in the next 12 months) scaled to 100%; the colored bar is TTM operating cash flow on the same scale. Short of 100%, the rest has to come from cash on hand or new money.</p>
+      <div class="cw-chart" id="adequacy-chart"></div>
+      <div class="cw-legend" id="adequacy-legend"></div>
+    </section>
+    <section class="cw-card" id="quarters">
+      <h3>The last eight quarters</h3>
+      <div class="cw-seg" role="group" aria-label="Quarterly measure" id="quarter-ctl"></div>
+      <p class="cw-note" id="quarters-note"></p>
+      <div class="cw-chart" id="quarters-chart"></div>
+      <div class="cw-legend" id="quarters-legend"></div>
+    </section>
+  </div>
+
+  <h2 class="cw-h2">3 · Cash-flow tightness: how long does liquidity last without new money?</h2>
+  <div class="cw-grid">
+    <section class="cw-card" id="runway">
+      <h3>Runway: liquidity left, as a share of today's</h3>
+      <div class="cw-seg" role="group" aria-label="Maturities" id="runway-ctl"></div>
+      <p class="cw-note" id="runway-note"></p>
+      <div class="cw-chart" id="runway-chart"></div>
+      <div class="cw-legend" id="runway-legend"></div>
+    </section>
+    <section class="cw-card" id="maturity">
+      <h3>Maturity profile: share of today's debt due</h3>
+      <p class="cw-note">Scheduled principal, cumulative by each period end, as a share of the debt the model schedules (period-end principal plus post-period draws; a repurchase after the period counts as paid at once). A steeper early climb means more has to be repaid or refinanced sooner.</p>
+      <div class="cw-chart" id="maturity-chart"></div>
+      <div class="cw-legend" id="maturity-legend"></div>
+    </section>
+  </div>
+
+  <section class="cw-card" id="measures">
+    <h3>Every measure</h3>
+    <p class="cw-note">The stronger value is in bold; "even" means within 5%. A measure missing on either side is not counted. Size rows are context only.</p>
+    <div class="cw-table-wrap cx-table-wrap"><table class="cw-table cx-table" id="measure-table"></table></div>
+  </section>
+
+  <section class="cw-card cw-method" id="method">
+    <h3>Sources and method</h3>
+    <div id="method-body"></div>
+  </section>
+</main>
+<div class="cw-tip" id="tip"></div>
+<script id="comparison-data" type="application/json">{{ data_json }}</script>
+<script>{{ d3 }}</script>
+<script>{{ charts }}</script>
+<script>{{ js }}</script>
+</body>
+</html>

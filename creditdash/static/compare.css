@@ -1,0 +1,37 @@
+/* Comparison page, on top of dashboard.css. The two companies take categorical slots 1 and 2 of the reference
+   palette (blue, orange: validated as a pair, both modes); the needs bars are two neutral grays, and the zones of
+   the coverage tests use the status washes the top card already uses. */
+:root {
+  --c-a: #2a78d6; --c-b: #eb6834; --c-even: #c3c2b7; --c-capex: #898781; --c-principal: #c3c2b7;
+  --zone-not_covered: #fbe9e8; --zone-thin: #fff3d6; --zone-covered: #e7f5e7;
+}
+.cx-verdict { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: var(--gap-md); }
+.cx-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); gap: var(--gap-lg); }
+.cx-col { display: flex; flex-direction: column; gap: var(--gap-sm); min-width: 0; padding-top: 12px; border-top: 4px solid var(--c-a); }
+.cx-col.is-b { border-top-color: var(--c-b); }
+.cx-ticker { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font-size: var(--fs-title); font-weight: 600; line-height: 1.1; }
+.cx-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c-a); align-self: center; flex: none; }
+.cx-col.is-b .cx-dot { background: var(--c-b); }
+.cx-name { font-size: var(--fs-body); font-weight: 400; color: var(--fg-secondary); }
+.cx-bottom { margin: 0; font-size: var(--fs-body); line-height: 1.5; }
+.cx-test-value { font-size: 20px; font-weight: 600; line-height: 1.1; }
+.cx-col .cw-badge { padding: 0 8px; }
+.cx-open { color: inherit; }
+.cx-score { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+.cx-score-row { display: grid; grid-template-columns: 11rem minmax(4rem, 1fr) minmax(0, 15rem); gap: var(--gap-md); align-items: center; font-size: var(--fs-caption); }
+.cx-score-label { font-weight: 600; color: var(--fg-secondary); }
+.cx-score-bar { display: flex; gap: 2px; height: 10px; }
+.cx-score-bar span { border-radius: 2px; }
+.cx-score-bar .is-a { background: var(--c-a); } .cx-score-bar .is-b { background: var(--c-b); } .cx-score-bar .is-even { background: var(--c-even); }
+.cx-score-text { color: var(--fg); }
+@media (max-width: 600px) { .cx-score-row { grid-template-columns: 1fr; gap: 2px; } .cx-score-row + .cx-score-row { margin-top: 6px; } }
+.cx-table-wrap { max-height: none; }
+.cx-table td.sec { padding-top: 14px; font-weight: 600; color: var(--fg); border-bottom-color: var(--axis); }
+.cx-table td.sec .cw-note { font-weight: 400; margin-left: 8px; }
+.cx-table td.is-stronger { font-weight: 600; color: var(--fg); }
+.cx-table td.how { color: var(--fg-secondary); min-width: 14rem; }
+.cx-table .miss { color: var(--fg-muted); font-style: italic; }
+.cx-table td.who { white-space: nowrap; }
+.cx-table td.who .cw-sw { margin-right: 6px; }
+.cx-table th .cw-sw { margin-right: 6px; vertical-align: -1px; }
+.cx-col .cw-tests { grid-template-columns: repeat(auto-fit, minmax(min(100%, 6.5rem), 1fr)); gap: var(--gap-sm) var(--gap-md); }

@@ -168,3 +168,30 @@ def test_list_dashboards(settings, build, opened):
     rows = r.structured_content["result"]
     assert [(x["ticker"], x["period"], x["company"]) for x in rows] == [
         ("CRWV", "2026-06-30", "Toy Compute, Inc."), ("NBIS", "2026-06-30", "Toy Compute, Inc.")]
+
+
+def test_compare_credit_builds_both_and_names_the_stronger(settings, build, opened):
+    r = call(make(settings, build, opened), "compare_credit", {"ticker_a": "crwv", "ticker_b": "NBIS"})
+    assert not r.is_error, r.content
+    out = r.structured_content
+    assert [c["ticker"] for c in out["companies"]] == ["CRWV", "NBIS"]
+    assert [x["ticker"] for x in build.calls] == ["CRWV", "NBIS"]
+    assert {"repayment", "adequacy", "tightness"} == set(out["tally"])
+    assert all("CRWV" in m and "NBIS" in m and "stronger" in m for m in out["measures"])
+    assert out["comparison"]["path"].endswith("_compare/CRWV_vs_NBIS/index.html")
+
+
+def test_show_comparison_in_chat_with_apps(settings, build, opened):
+    write_outputs(sample_dashboard(ticker="CRWV"), settings.out)
+    server = make(settings, build, opened)
+    r = call(server, "show_comparison", {"ticker_a": "CRWV", "ticker_b": "NBIS"}, apps=True)
+    assert not r.is_error and [x["ticker"] for x in build.calls] == ["NBIS"]  # CRWV was built already
+    assert r.structured_content["ticker_a"] == "CRWV" and r.structured_content["shown_in_chat"] and not opened
+    page = call(server, "comparison_html", {"ticker_a": "CRWV", "ticker_b": "NBIS"}, apps=True)
+    assert 'id="comparison-data"' in page.content[0].text
+    assert call(server, "comparison_html", {"ticker_a": "CRWV", "ticker_b": "NBIS"}).is_error  # viewer only
+
+
+def test_viewer_loads_comparisons():
+    from creditdash.mcp_server import VIEW_HTML
+    assert "comparison_html" in VIEW_HTML and "ticker_a" in VIEW_HTML

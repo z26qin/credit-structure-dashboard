@@ -1,6 +1,7 @@
 """ticker -> resolve -> fetch -> facts -> extract -> reconcile -> market -> model -> render -> index.html
 
 The model stage also builds the top card: the coverage tests (headline.py) and the market read (creditrisk.py).
+A comparison (compare.py) reads two built dashboards and writes its own page.
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ from typing import Callable
 import httpx
 
 from . import creditrisk, interim, llm
+from .compare import compare
 from .config import ModelSettings, Settings, load_model_settings
 from .edgar import Edgar, archive_url, companyfacts_url, instance_doc
 from .errors import SecError, UnsupportedFiler
@@ -21,9 +23,9 @@ from .facts import build_financials, fiscal_year_of
 from .interim import debt_filings, extract_interim, find_interim, verify
 from .market import fetch_market
 from .model import run_model
-from .models import Dashboard, Filing, Financials, Resolved
+from .models import Comparison, Dashboard, Filing, Financials, Resolved
 from .reconcile import reconcile
-from .render import write_outputs
+from .render import write_comparison, write_outputs
 from .resolve import resolve
 
 STAGES = ("resolve", "fetch", "facts", "extract", "reconcile", "market", "model", "render")
@@ -106,6 +108,23 @@ def build(ticker: str, *, settings: Settings, refresh: bool = False, no_llm: boo
                                                 "prompt_version": None if no_llm else PROMPT_VERSION} | inputs.settings,
     )
     return write_outputs(dashboard, settings.out)
+
+
+def compare_builds(index_a: Path, index_b: Path, out: Path) -> tuple[Path, Comparison]:
+    """Two built dashboards (their index.html) -> the comparison page."""
+    load = lambda p: Dashboard.model_validate_json((p.parent / "dashboard.json").read_text())
+    comparison = compare(load(index_a), load(index_b))
+    return write_comparison(comparison, out), comparison
+
+
+def build_comparison(ticker_a: str, ticker_b: str, *, settings: Settings,
+                     progress: Callable[[str], None] = lambda s: None, build_fn: Callable[..., Path] | None = None,
+                     **kw) -> Path:
+    """Build both tickers (from cache where it can), then compare them. `kw` goes to each build."""
+    build_fn = build_fn or build
+    paths = [build_fn(t, settings=settings, progress=lambda stage, t=t: progress(f"{t}: {stage}"), **kw)
+             for t in (ticker_a, ticker_b)]
+    return compare_builds(paths[0], paths[1], settings.out)[0]
 
 
 def _domestic(resolved: Resolved, edgar: Edgar, settings: Settings, companyfacts: dict, instance: str,
